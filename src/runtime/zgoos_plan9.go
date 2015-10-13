@@ -15,3 +15,4 @@ const goos_openbsd = 0
 const goos_plan9 = 1
 const goos_solaris = 0
 const goos_windows = 0
+const goos_atman = 0

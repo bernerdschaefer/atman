@@ -59,6 +59,7 @@ var okgoarch = []string{
 
 // The known operating systems.
 var okgoos = []string{
+	"atman",
 	"darwin",
 	"dragonfly",
 	"linux",
