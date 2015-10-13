@@ -58,6 +58,8 @@ func msigsave(mp *m) {}
 //go:nosplit
 func osyield() {}
 
+func osinit() {}
+
 // signals
 
 const _NSIG = 0
