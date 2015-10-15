@@ -1,4 +1,7 @@
 TEXT _rt0_amd64_atman(SB),NOSPLIT,$-8
+	CLD
+	MOVQ	$runtime·_atman_stack+0x4000(SB), SP
+	ANDQ	$(~(0x1000-1)), SP
 	LEAQ	8(SP), SI // argv
 	MOVQ	0(SP), DI // argc
 	MOVQ	$main(SB), AX
