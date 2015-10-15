@@ -1103,6 +1103,36 @@ func elfwritenetbsdsig() int {
 	return int(sh.size)
 }
 
+// Atman signature
+func elfatmansig(sh *ElfShdr, startva uint64, resoff uint64) int {
+	n := 4 + 8
+	return elfnote(sh, startva, resoff, n, true)
+}
+
+func elfwriteatmansig() int {
+	var n int
+
+	sh := elfwritenotehdr(".note.Xen.loader", 4, 8, 8)
+	if sh == nil {
+		return n
+	}
+	n += int(sh.size)
+
+	Cwrite([]byte("Xen\x00"))
+	Cwrite([]byte("generic\x00"))
+
+	sh = elfwritenotehdr(".note.Xen.version", 4, 8, 5)
+	if sh == nil {
+		return n
+	}
+	n += int(sh.size)
+
+	Cwrite([]byte("Xen\x00"))
+	Cwrite([]byte("xen-3.0\x00"))
+
+	return n
+}
+
 // OpenBSD Signature
 const (
 	ELF_NOTE_OPENBSD_NAMESZ  = 8
@@ -1686,6 +1716,10 @@ func doelf() {
 	if buildid != "" {
 		Addstring(shstrtab, ".note.go.buildid")
 	}
+
+	Addstring(shstrtab, ".note.Xen.loader")
+	Addstring(shstrtab, ".note.Xen.version")
+
 	Addstring(shstrtab, ".elfdata")
 	Addstring(shstrtab, ".rodata")
 	Addstring(shstrtab, ".typelink")
@@ -2130,6 +2164,24 @@ func Asmbelf(symo int64) {
 		phsh(pnote, sh)
 	}
 
+	{
+		sh := elfshname(".note.Xen.loader")
+		resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
+		pnote := newElfPhdr()
+		pnote.type_ = PT_NOTE
+		pnote.flags = PF_R
+		phsh(pnote, sh)
+	}
+
+	{
+		sh := elfshname(".note.Xen.version")
+		resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
+		pnote := newElfPhdr()
+		pnote.type_ = PT_NOTE
+		pnote.flags = PF_R
+		phsh(pnote, sh)
+	}
+
 	// Additions to the reserved area must be above this line.
 
 	elfphload(&Segtext)
@@ -2445,6 +2497,7 @@ elfobj:
 			a += int64(elfwritegobuildid())
 		}
 	}
+	a += int64(elfwriteatmansig())
 
 	if a > elfreserve {
 		Diag("ELFRESERVE too small: %d > %d", a, elfreserve)
