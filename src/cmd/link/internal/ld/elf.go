@@ -2076,7 +2076,7 @@ func Asmbelf(symo int64) {
 	 * segment boundaries downwards to include it.
 	 * Except on NaCl where it must not be loaded.
 	 */
-	if HEADTYPE != obj.Hnacl {
+	if HEADTYPE != obj.Hnacl && false {
 		o := int64(Segtext.Vaddr - pph.vaddr)
 		Segtext.Vaddr -= uint64(o)
 		Segtext.Length += uint64(o)
