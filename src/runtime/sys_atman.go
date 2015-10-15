@@ -2,7 +2,7 @@ package runtime
 
 import "unsafe"
 
-var _atman_stack [0x4000]byte
+var _atman_stack [0x10000]byte
 
 //go:nosplit
 func getRandomData(r []byte) {

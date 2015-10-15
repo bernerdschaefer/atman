@@ -18,14 +18,5 @@ TEXT time·now(SB),NOSPLIT,$16
 	RET
 
 // set tls base to DI
-TEXT runtime·settls(SB),NOSPLIT,$32
-	ADDQ	$8, DI	// ELF wants to use -8(FS)
-
-	MOVQ	DI, SI
-	MOVQ	$0x1002, DI	// ARCH_SET_FS
-	MOVQ	$158, AX	// arch_prctl
-	SYSCALL
-	CMPQ	AX, $0xfffffffffffff001
-	JLS	2(PC)
-	MOVL	$0xf1, 0xf1  // crash
+TEXT runtime·settls(SB),NOSPLIT,$0
 	RET

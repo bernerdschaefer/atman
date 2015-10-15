@@ -56,6 +56,7 @@ var (
 	isplan9   int32
 	issolaris int32
 	iswindows int32
+	isatman   int32
 )
 
 func goargs() {
