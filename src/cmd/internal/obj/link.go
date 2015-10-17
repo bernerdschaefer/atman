@@ -545,6 +545,7 @@ const (
 	Hplan9
 	Hsolaris
 	Hwindows
+	Hatman
 )
 
 type Plist struct {

@@ -106,7 +106,8 @@ func linknew(arch *LinkArch) *Link {
 		obj.Hnetbsd,
 		obj.Hopenbsd,
 		obj.Hdragonfly,
-		obj.Hsolaris:
+		obj.Hsolaris,
+		obj.Hatman:
 		ctxt.Tlsoffset = -1 * ctxt.Arch.Ptrsize
 
 	case obj.Hnacl:

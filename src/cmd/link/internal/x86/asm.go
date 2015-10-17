@@ -632,7 +632,8 @@ func asmb() {
 		obj.Hfreebsd,
 		obj.Hnetbsd,
 		obj.Hopenbsd,
-		obj.Hnacl:
+		obj.Hnacl,
+		obj.Hatman:
 		ld.Asmbelf(int64(symo))
 
 	case obj.Hwindows:

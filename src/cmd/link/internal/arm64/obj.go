@@ -100,7 +100,8 @@ func archinit() {
 		if ld.Linkmode == ld.LinkExternal && obj.Getgoextlinkenabled() != "1" {
 			log.Fatalf("cannot use -linkmode=external with -H %s", ld.Headstr(int(ld.HEADTYPE)))
 		}
-	case obj.Hlinux, obj.Hdarwin:
+	case obj.Hlinux, obj.Hdarwin,
+		obj.Hatman:
 		break
 	}
 
@@ -121,7 +122,8 @@ func archinit() {
 			ld.INITRND = 4096
 		}
 
-	case obj.Hlinux: /* arm64 elf */
+	case obj.Hlinux,
+		obj.Hatman: /* arm64 elf */
 		ld.Elfinit()
 		ld.HEADR = ld.ELFRESERVE
 		if ld.INITTEXT == -1 {

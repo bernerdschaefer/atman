@@ -100,7 +100,8 @@ func archinit() {
 		obj.Hlinux,
 		obj.Hnetbsd,
 		obj.Hopenbsd,
-		obj.Hwindows:
+		obj.Hwindows,
+		obj.Hatman:
 		break
 	}
 
@@ -138,7 +139,8 @@ func archinit() {
 	case obj.Hlinux, /* elf32 executable */
 		obj.Hfreebsd,
 		obj.Hnetbsd,
-		obj.Hopenbsd:
+		obj.Hopenbsd,
+		obj.Hatman:
 		ld.Elfinit()
 
 		ld.HEADR = ld.ELFRESERVE

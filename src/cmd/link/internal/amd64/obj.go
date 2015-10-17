@@ -111,7 +111,8 @@ func archinit() {
 		obj.Hnetbsd,
 		obj.Hopenbsd,
 		obj.Hsolaris,
-		obj.Hwindows:
+		obj.Hwindows,
+		obj.Hatman:
 		break
 	}
 

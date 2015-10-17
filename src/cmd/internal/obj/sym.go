@@ -49,7 +49,6 @@ var headers = []struct {
 	{"freebsd", Hfreebsd},
 	{"linux", Hlinux},
 	{"android", Hlinux}, // must be after "linux" entry or else headstr(Hlinux) == "android"
-	{"atman", Hlinux},
 	{"nacl", Hnacl},
 	{"netbsd", Hnetbsd},
 	{"openbsd", Hopenbsd},
@@ -57,6 +56,7 @@ var headers = []struct {
 	{"solaris", Hsolaris},
 	{"windows", Hwindows},
 	{"windowsgui", Hwindows},
+	{"atman", Hatman},
 }
 
 func headtype(name string) int {
@@ -125,7 +125,8 @@ func Linknew(arch *LinkArch) *Link {
 		Hnetbsd,
 		Hopenbsd,
 		Hdragonfly,
-		Hsolaris:
+		Hsolaris,
+		Hatman:
 		ctxt.Tlsoffset = -1 * ctxt.Arch.Ptrsize
 
 	case Hnacl:

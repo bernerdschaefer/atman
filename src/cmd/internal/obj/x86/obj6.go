@@ -44,7 +44,8 @@ func canuse1insntls(ctxt *obj.Link) bool {
 		case obj.Hlinux,
 			obj.Hnacl,
 			obj.Hplan9,
-			obj.Hwindows:
+			obj.Hwindows,
+			obj.Hatman:
 			return false
 		}
 
@@ -55,7 +56,7 @@ func canuse1insntls(ctxt *obj.Link) bool {
 	case obj.Hplan9,
 		obj.Hwindows:
 		return false
-	case obj.Hlinux:
+	case obj.Hlinux, obj.Hatman:
 		return ctxt.Flag_shared == 0
 	}
 
