@@ -165,7 +165,8 @@ func archinit() {
 		obj.Hnetbsd,    /* netbsd */
 		obj.Hopenbsd,   /* openbsd */
 		obj.Hdragonfly, /* dragonfly */
-		obj.Hsolaris:   /* solaris */
+		obj.Hsolaris,   /* solaris */
+		obj.Hatman:
 		ld.Elfinit()
 
 		ld.HEADR = ld.ELFRESERVE
