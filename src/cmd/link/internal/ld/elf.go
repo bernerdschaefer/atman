@@ -1130,6 +1130,17 @@ func elfwriteatmansig() int {
 	Cwrite([]byte("Xen\x00"))
 	Cwrite([]byte("xen-3.0\x00"))
 
+	sh = elfwritenotehdr(".note.Xen.hypercall_page", 4, 8, 2)
+	if sh == nil {
+		return n
+	}
+	n += int(sh.size)
+
+	Cwrite([]byte("Xen\x00"))
+
+	hypercallPage := Linklookup(Ctxt, "runtime._atman_hypercall_page", 0)
+	Thearch.Vput(uint64(Symaddr(hypercallPage)))
+
 	return n
 }
 
@@ -1717,8 +1728,11 @@ func doelf() {
 		Addstring(shstrtab, ".note.go.buildid")
 	}
 
-	Addstring(shstrtab, ".note.Xen.loader")
-	Addstring(shstrtab, ".note.Xen.version")
+	if HEADTYPE == obj.Hatman {
+		Addstring(shstrtab, ".note.Xen.loader")
+		Addstring(shstrtab, ".note.Xen.version")
+		Addstring(shstrtab, ".note.Xen.hypercall_page")
+	}
 
 	Addstring(shstrtab, ".elfdata")
 	Addstring(shstrtab, ".rodata")
@@ -2164,22 +2178,33 @@ func Asmbelf(symo int64) {
 		phsh(pnote, sh)
 	}
 
-	{
-		sh := elfshname(".note.Xen.loader")
-		resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
-		pnote := newElfPhdr()
-		pnote.type_ = PT_NOTE
-		pnote.flags = PF_R
-		phsh(pnote, sh)
-	}
+	if HEADTYPE == obj.Hatman {
+		{
+			sh := elfshname(".note.Xen.loader")
+			resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
+			pnote := newElfPhdr()
+			pnote.type_ = PT_NOTE
+			pnote.flags = PF_R
+			phsh(pnote, sh)
+		}
 
-	{
-		sh := elfshname(".note.Xen.version")
-		resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
-		pnote := newElfPhdr()
-		pnote.type_ = PT_NOTE
-		pnote.flags = PF_R
-		phsh(pnote, sh)
+		{
+			sh := elfshname(".note.Xen.version")
+			resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
+			pnote := newElfPhdr()
+			pnote.type_ = PT_NOTE
+			pnote.flags = PF_R
+			phsh(pnote, sh)
+		}
+
+		{
+			sh := elfshname(".note.Xen.hypercall_page")
+			resoff -= int64(elfatmansig(sh, uint64(startva), uint64(resoff)))
+			pnote := newElfPhdr()
+			pnote.type_ = PT_NOTE
+			pnote.flags = PF_R
+			phsh(pnote, sh)
+		}
 	}
 
 	// Additions to the reserved area must be above this line.
@@ -2497,7 +2522,9 @@ elfobj:
 			a += int64(elfwritegobuildid())
 		}
 	}
-	a += int64(elfwriteatmansig())
+	if HEADTYPE == obj.Hatman {
+		a += int64(elfwriteatmansig())
+	}
 
 	if a > elfreserve {
 		Diag("ELFRESERVE too small: %d > %d", a, elfreserve)

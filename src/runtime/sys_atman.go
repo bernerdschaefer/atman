@@ -2,10 +2,23 @@ package runtime
 
 import "unsafe"
 
-var _atman_stack [0x10000]byte
+const (
+	_PAGESIZE = 0x1000
+)
+
+var (
+	_atman_stack          [8 * _PAGESIZE]byte
+	_atman_start_info     *xenStartInfo
+	_atman_hypercall_page [_PAGESIZE]byte
+)
+
+func forceReachability() {
+	_atman_hypercall_page[0] = 'a'
+}
 
 //go:nosplit
 func getRandomData(r []byte) {
+	forceReachability() // TODO: remove this
 	extendRandom(r, 0)
 }
 
@@ -76,3 +89,26 @@ func raisebadsignal(sig int32) {}
 
 func netpoll(block bool) *g { return nil }
 func netpollinited() bool   { return false }
+
+type xenStartInfo struct {
+	Magic          [32]byte
+	NrPages        uint32
+	SharedInfoAddr uint32 // machine address of share info struct
+	SIFFlags       uint32
+	StoreMfn       uint32 // machine page number of shared page
+	StoreEventchn  uint32
+	Console        struct {
+		Mfn      uint32 // machine page number of console page
+		Eventchn uint32 // event channel
+	}
+	PageTableBase     uint32 // virtual address of page directory
+	NrPageTableFrames uint32
+	MfnList           uint32 // virtual address of page-frame list
+	ModStart          uint32 // virtual address of pre-loaded module
+	ModLen            uint32 // size (bytes) of pre-loaded module
+	CmdLine           [1024]byte
+
+	// The pfn range here covers both page table and p->m table frames
+	FirstP2mPfn uint32 // 1st pfn forming initial P->M table
+	NrP2mFrames uint32 // # of pgns forming initial P->M table
+}
