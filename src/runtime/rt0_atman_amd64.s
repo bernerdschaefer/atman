@@ -8,8 +8,9 @@ TEXT _rt0_amd64_atman(SB),NOSPLIT,$-8
 	MOVQ	$6, SI // strlen(8)
 	MOVQ	$runtime·_atman_hello(SB), DX
 	MOVQ	$runtime·_atman_hypercall_page+0x240(SB), AX
-	// callq *(%rax)
-	BYTE $0xFF; BYTE $0x10
+	// callq *%rax
+	BYTE $0xFF; BYTE $0xd0
+	MOVQ	AX, (SP)
 
 	MOVQ	$0, SI // argv
 	MOVQ	$0, DI // argc
