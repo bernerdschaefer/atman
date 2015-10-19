@@ -10,6 +10,8 @@ var (
 	_atman_stack          [8 * _PAGESIZE]byte
 	_atman_start_info     *xenStartInfo
 	_atman_hypercall_page [_PAGESIZE]byte
+
+	_atman_hello [8]byte
 )
 
 func forceReachability() {
