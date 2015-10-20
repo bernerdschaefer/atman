@@ -117,3 +117,33 @@ type xenStartInfo struct {
 	FirstP2mPfn uint64 // 1st pfn forming initial P->M table
 	NrP2mFrames uint64 // # of pgns forming initial P->M table
 }
+
+// type descStruct struct {
+// 	a uint32
+// 	b uint32
+// }
+//
+// type gdtPage struct {
+// 	gdt [16]descStruct
+// 	_   [3968]byte // pad to page size
+// }
+//
+// var _atman_gdt_page = &gdtPage{}
+//
+// func setupGDT() {
+// 	var frame uintptr
+//
+// 	page := uintptr(unsafe.Pointer(_atman_gdt_page))
+// 	pfn := virtToPfn(page)
+// 	mfn := pfnToMfn(pfn)
+//
+// 	pte := pfnPte(pfn, READ_ONLY)
+//
+// 	if HYPERVISOR_update_va_mapping(page, pte, 0) {
+// 		BUG()
+// 	}
+//
+// 	frame = mfn
+//
+// 	HYPERVISOR_set_gdt(frame, 16)
+// }
