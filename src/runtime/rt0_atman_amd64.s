@@ -15,8 +15,7 @@ TEXT _rt0_amd64_atman(SB),NOSPLIT,$-8
 
 	MOVQ	runtime·_atman_start_info+0(SB), AX
 	ADDQ	$104, (AX)
-	MOVQ	(AX), DX
-	MOVQ	DX, runtime·_atman_phys_to_machine_mapping+0(SB)
+	MOVQ	AX, runtime·_atman_phys_to_machine_mapping(SB)
 
 	MOVQ	$0, SI // argv
 	MOVQ	$0, DI // argc

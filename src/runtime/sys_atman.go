@@ -13,7 +13,7 @@ var (
 
 	_atman_hello [8]byte
 
-	_atman_phys_to_machine_mapping uintptr
+	_atman_phys_to_machine_mapping = [256]uint64{}
 )
 
 func forceReachability() {
