@@ -12,6 +12,8 @@ var (
 	_atman_hypercall_page [_PAGESIZE]byte
 
 	_atman_hello [8]byte
+
+	_atman_phys_to_machine_mapping uintptr
 )
 
 func forceReachability() {
