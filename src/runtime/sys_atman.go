@@ -118,17 +118,18 @@ type xenStartInfo struct {
 	NrP2mFrames uint64 // # of pgns forming initial P->M table
 }
 
-// type descStruct struct {
-// 	a uint32
-// 	b uint32
-// }
-//
-// type gdtPage struct {
-// 	gdt [16]descStruct
-// 	_   [3968]byte // pad to page size
-// }
-//
-// var _atman_gdt_page = &gdtPage{}
+type descStruct struct {
+	a uint32
+	b uint32
+}
+
+type gdtPage struct {
+	gdt [16]descStruct
+	_   [3968]byte // pad to page size
+}
+
+var _atman_gdt_page = &gdtPage{}
+
 //
 // func setupGDT() {
 // 	var frame uintptr
