@@ -2,11 +2,20 @@
 	ADDQ	$0x0000000000000fff, REGISTER	\
 	ANDQ	$0xfffffffffffff000, REGISTER
 
+#define CALL_RBX                \
+	BYTE $0xff; BYTE $0xd3	// callq *%rbx
+
+#define CRASH_ON_NONZERO	\
+	CMPQ	AX, $-1		\
+	JNE	2(PC)		\
+	ANDQ	$0xdeadbeef, 0xdeadbeef
+
 #define _HYPERCALL(OFFSET)				\
 	MOVQ	$runtime·_atman_hypercall_page(SB), BX	\
 	_PAGE_ROUND_UP(BX)				\
 	ADDQ	OFFSET, BX				\
-	BYTE $0xff; BYTE $0xd3 // callq *%rbx
+	CALL_RBX                                        \
+	CRASH_ON_NONZERO
 
 #define _HYPERVISOR_console_io(OP, SIZE, DATA_PTR) \
 	MOVQ	OP, DI		\
