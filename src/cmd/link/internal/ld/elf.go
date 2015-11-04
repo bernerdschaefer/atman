@@ -1138,8 +1138,13 @@ func elfwriteatmansig() int {
 
 	Cwrite([]byte("Xen\x00"))
 
-	hypercallPage := Linklookup(Ctxt, "runtime._atman_hypercall_page", 0)
-	Thearch.Vput(uint64(Symaddr(hypercallPage)))
+	var (
+		hypercallPage      = Linklookup(Ctxt, "runtime._atman_hypercall_page", 0)
+		pageSize           = 0x1000
+		pageStart          = uint64(Symaddr(hypercallPage))
+		hypercallPageStart = (pageStart + pageSize - 1) &^ (pageSize - 1)
+	)
+	Thearch.Vput(hypercallPageStart)
 
 	return n
 }

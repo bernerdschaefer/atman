@@ -9,20 +9,15 @@ const (
 var (
 	_atman_stack          [8 * _PAGESIZE]byte
 	_atman_start_info     = &xenStartInfo{}
-	_atman_hypercall_page [_PAGESIZE]byte
+	_atman_hypercall_page [2 * _PAGESIZE]byte
 
 	_atman_hello [8]byte
 
 	_atman_phys_to_machine_mapping = [256]uint64{}
 )
 
-func forceReachability() {
-	_atman_hypercall_page[0] = 'a'
-}
-
 //go:nosplit
 func getRandomData(r []byte) {
-	forceReachability() // TODO: remove this
 	extendRandom(r, 0)
 }
 
