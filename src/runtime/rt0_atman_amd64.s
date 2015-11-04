@@ -26,17 +26,18 @@
 	MOVQ	DATA_PTR, DX	\
 	_HYPERCALL($0x240)
 
+#define _HYPERVISOR_set_segment_base(WHICH, BASE) \
+	MOVQ	WHICH,	DI				\
+	MOVQ	BASE, SI				\
+	_HYPERCALL($0x320)
+
 TEXT _rt0_amd64_atman(SB),NOSPLIT,$-8
 	CLD
-	MOVQ	$runtime·_atman_stack+0x8000(SB), SP
+	MOVQ	$runtime·_atman_stack+0x4000(SB), SP
+	MOVQ	SP, BP
 	MOVQ	SI, runtime·_atman_start_info(SB)
 
 	_HYPERVISOR_console_io($0, $7, $runtime·_atman_hello(SB))
-
-load_phys_to_machine_mapping:
-	MOVQ	runtime·_atman_start_info(SB), AX
-	ADDQ	$104, (AX)
-	MOVQ	AX, runtime·_atman_phys_to_machine_mapping(SB)
 
 	MOVQ	$main(SB), AX
 	JMP	AX
@@ -44,6 +45,12 @@ load_phys_to_machine_mapping:
 TEXT main(SB),NOSPLIT,$-8
 	MOVQ	$runtime·rt0_go(SB), AX
 	JMP	AX
+
+// set tls base to DI
+TEXT runtime·settls(SB),NOSPLIT,$32
+	MOVQ	DI, AX
+	_HYPERVISOR_set_segment_base($0, AX)
+	RET
 
 DATA runtime·_atman_hello(SB)/8, $"hello\n"
 GLOBL runtime·_atman_hello(SB), NOPTR, $8
