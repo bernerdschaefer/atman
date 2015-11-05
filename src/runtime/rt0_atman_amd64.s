@@ -33,11 +33,9 @@
 
 TEXT _rt0_amd64_atman(SB),NOSPLIT,$-8
 	CLD
-	MOVQ	$runtime·_atman_stack+0x4000(SB), SP
-	MOVQ	SP, BP
-	MOVQ	SI, runtime·_atman_start_info(SB)
+	MOVQ	$runtime·_atman_stack+0x8000(SB), SP
 
-	_HYPERVISOR_console_io($0, $7, $runtime·_atman_hello(SB))
+	MOVQ	SI, runtime·_atman_start_info(SB)
 
 	MOVQ	$main(SB), AX
 	JMP	AX
@@ -55,6 +53,3 @@ TEXT runtime·settls(SB),NOSPLIT,$32
 TEXT ·HYPERVISOR_console_io(SB),$24-0
 	_HYPERVISOR_console_io(op+0(FP), size+8(FP), data+16(FP))
 	RET
-
-DATA runtime·_atman_hello(SB)/8, $"hello\n"
-GLOBL runtime·_atman_hello(SB), NOPTR, $8
