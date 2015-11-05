@@ -101,3 +101,24 @@ type xenStartInfo struct {
 	FirstP2mPfn uint64 // 1st pfn forming initial P->M table
 	NrP2mFrames uint64 // # of pgns forming initial P->M table
 }
+
+func atmaninit() {
+	println("Atman OS")
+	println("   start_info: ", _atman_start_info)
+	println("        magic: ", string(_atman_start_info.Magic[:]))
+	println("     nr_pages: ", _atman_start_info.NrPages)
+	println("  shared_info: ", _atman_start_info.SharedInfoAddr)
+	println("   siff_flags: ", _atman_start_info.SIFFlags)
+	println("    store_mfn: ", _atman_start_info.StoreMfn)
+	println("    store_evc: ", _atman_start_info.StoreEventchn)
+	println("  console_mfn: ", _atman_start_info.Console.Mfn)
+	println("  console_evc: ", _atman_start_info.Console.Eventchn)
+	println("      pt_base: ", _atman_start_info.PageTableBase)
+	println(" nr_pt_frames: ", _atman_start_info.NrPageTableFrames)
+	println("     mfn_list: ", _atman_start_info.MfnList)
+	println("    mod_start: ", _atman_start_info.ModStart)
+	println("      mod_len: ", _atman_start_info.ModLen)
+	println("     cmd_line: ", _atman_start_info.CmdLine[:])
+	println("    first_pfn: ", _atman_start_info.FirstP2mPfn)
+	println("nr_p2m_frames: ", _atman_start_info.NrP2mFrames)
+}
