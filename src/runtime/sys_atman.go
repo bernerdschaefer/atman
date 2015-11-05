@@ -82,7 +82,7 @@ func netpollinited() bool   { return false }
 type xenStartInfo struct {
 	Magic          [32]byte
 	NrPages        uint64
-	SharedInfoAddr uint64 // machine address of share info struct
+	SharedInfoAddr uintptr // machine address of share info struct
 	SIFFlags       uint32
 	StoreMfn       uint64 // machine page number of shared page
 	StoreEventchn  uint32
@@ -90,12 +90,11 @@ type xenStartInfo struct {
 		Mfn      uint64 // machine page number of console page
 		Eventchn uint32 // event channel
 	}
-	_                 uint64 // dom0 console
 	PageTableBase     uint64 // virtual address of page directory
 	NrPageTableFrames uint64
-	MfnList           uint64 // virtual address of page-frame list
-	ModStart          uint64 // virtual address of pre-loaded module
-	ModLen            uint64 // size (bytes) of pre-loaded module
+	MfnList           uintptr // virtual address of page-frame list
+	ModStart          uintptr // virtual address of pre-loaded module
+	ModLen            uint64  // size (bytes) of pre-loaded module
 	CmdLine           [1024]byte
 
 	// The pfn range here covers both page table and p->m table frames
