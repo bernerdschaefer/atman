@@ -52,5 +52,9 @@ TEXT runtime·settls(SB),NOSPLIT,$32
 	_HYPERVISOR_set_segment_base($0, AX)
 	RET
 
+TEXT ·HYPERVISOR_console_io(SB),$24-0
+	_HYPERVISOR_console_io(op+0(FP), size+8(FP), data+16(FP))
+	RET
+
 DATA runtime·_atman_hello(SB)/8, $"hello\n"
 GLOBL runtime·_atman_hello(SB), NOPTR, $8

@@ -16,6 +16,8 @@ var (
 	_atman_phys_to_machine_mapping = [256]uint64{}
 )
 
+func HYPERVISOR_console_io(op uint64, size uint64, data uintptr)
+
 //go:nosplit
 func getRandomData(r []byte) {
 	extendRandom(r, 0)
