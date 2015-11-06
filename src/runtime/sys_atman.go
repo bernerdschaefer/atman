@@ -14,8 +14,6 @@ var (
 	_atman_phys_to_machine_mapping = [256]uint64{}
 )
 
-func HYPERVISOR_console_io(op uint64, size uint64, data uintptr)
-
 //go:nosplit
 func getRandomData(r []byte) {
 	extendRandom(r, 0)
@@ -121,4 +119,28 @@ func atmaninit() {
 	println("     cmd_line: ", _atman_start_info.CmdLine[:])
 	println("    first_pfn: ", _atman_start_info.FirstP2mPfn)
 	println("nr_p2m_frames: ", _atman_start_info.NrP2mFrames)
+}
+
+func hypercall(trap, a1, a2, a3 uintptr) uintptr
+
+func HYPERVISOR_console_io(op uint64, size uint64, data uintptr) uintptr {
+	const _HYPERVISOR_console_io = 18
+
+	return hypercall(
+		_HYPERVISOR_console_io,
+		uintptr(op),
+		uintptr(size),
+		data,
+	)
+}
+
+func HYPERVISOR_update_va_mapping(vaddr uintptr, val uintptr, flags uint64) uintptr {
+	const _HYPERVISOR_update_va_mapping = 14
+
+	return hypercall(
+		_HYPERVISOR_update_va_mapping,
+		vaddr,
+		val,
+		uintptr(flags),
+	)
 }
