@@ -7,11 +7,12 @@ const (
 )
 
 var (
-	_atman_stack          [8 * _PAGESIZE]byte
-	_atman_start_info     = &xenStartInfo{}
-	_atman_hypercall_page [2 * _PAGESIZE]byte
+	_atman_stack            [8 * _PAGESIZE]byte
+	_atman_hypercall_page   [2 * _PAGESIZE]byte
+	_atman_shared_info_page [2 * _PAGESIZE]byte
 
-	_atman_phys_to_machine_mapping = [256]uint64{}
+	_atman_start_info  = &xenStartInfo{}
+	_atman_shared_info = &xenSharedInfo{}
 )
 
 //go:nosplit
@@ -100,6 +101,48 @@ type xenStartInfo struct {
 	NrP2mFrames uint64 // # of pgns forming initial P->M table
 }
 
+type xenSharedInfo struct {
+	VCPUInfo      [32]vcpuInfo
+	EvtchnPending [64]uint64
+	EvtchnMask    [64]uint64
+	WcVersion     uint32
+	WcSec         uint32
+	WcNsec        uint32
+	_             [4]byte
+	Arch          archSharedInfo
+}
+
+type archSharedInfo struct {
+	MaxPfn                uint64
+	PfnToMfnFrameListList uint64
+	NmiReason             uint64
+	_                     [32]uint64
+}
+
+type archVCPUInfo struct {
+	CR2 uint64
+	_   uint64
+}
+
+type vcpuTimeInfo struct {
+	Version        uint32
+	_              uint32
+	TscTimestamp   uint64
+	SystemTime     uint64
+	TscToSystemMul uint32
+	TscShift       int8
+	_              [3]int8
+}
+
+type vcpuInfo struct {
+	UpcallPending uint8
+	UpcallMask    uint8
+	_             [6]byte
+	PendingSel    uint64
+	Arch          archVCPUInfo
+	Time          vcpuTimeInfo
+}
+
 func atmaninit() {
 	println("Atman OS")
 	println("   start_info: ", _atman_start_info)
@@ -119,6 +162,31 @@ func atmaninit() {
 	println("     cmd_line: ", _atman_start_info.CmdLine[:])
 	println("    first_pfn: ", _atman_start_info.FirstP2mPfn)
 	println("nr_p2m_frames: ", _atman_start_info.NrP2mFrames)
+
+	mapSharedInfo(_atman_start_info.SharedInfoAddr, _atman_shared_info)
+}
+
+func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
+	pageAddr := roundUpPage(
+		uintptr(unsafe.Pointer(&_atman_shared_info_page[0])),
+	)
+
+	ret := HYPERVISOR_update_va_mapping(
+		pageAddr,
+		vaddr|7,
+		2, // UVMF_INVLPG: flush only one entry
+	)
+
+	if ret != 0 {
+		println("HYPERVISOR_update_va_mapping returned ", ret)
+		panic("HYPERVISOR_update_va_mapping failed")
+	}
+
+	*i = *(*xenSharedInfo)(unsafe.Pointer(pageAddr))
+}
+
+func roundUpPage(addr uintptr) uintptr {
+	return (addr + _PAGESIZE - 1) &^ (_PAGESIZE - 1)
 }
 
 func hypercall(trap, a1, a2, a3 uintptr) uintptr
