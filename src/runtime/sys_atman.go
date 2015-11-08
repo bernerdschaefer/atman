@@ -163,7 +163,39 @@ func atmaninit() {
 	println("    first_pfn: ", _atman_start_info.FirstP2mPfn)
 	println("nr_p2m_frames: ", _atman_start_info.NrP2mFrames)
 
+	println("setting _atman_phys_to_machine_mapping")
+	_atman_phys_to_machine_mapping = *(*[8192]uint64)(unsafe.Pointer(
+		_atman_start_info.MfnList,
+	))
+
+	printPageDirectory()
+
+	println("mapping _atman_start_info")
 	mapSharedInfo(_atman_start_info.SharedInfoAddr, _atman_shared_info)
+
+	// printPageDirectory()
+}
+
+func printPageDirectory() {
+	var table xenPageDirectory
+	table = *(*xenPageDirectory)(unsafe.Pointer(uintptr(
+		_atman_start_info.PageTableBase,
+	)))
+
+	for _, x := range table {
+		if x.hasFlag(xenPageTablePresent) {
+			x.debug()
+			println("pte2virt: ", pteToVirt(x))
+		}
+	}
+}
+
+func pteToVirt(e pageTableEntry) unsafe.Pointer {
+	const (
+		m2p xenMachineToPhysicalMap = 0xFFFF800000000000
+	)
+
+	return unsafe.Pointer(m2p.Get(e.Mfn()) << 12)
 }
 
 func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
@@ -211,4 +243,87 @@ func HYPERVISOR_update_va_mapping(vaddr uintptr, val uintptr, flags uint64) uint
 		val,
 		uintptr(flags),
 	)
+}
+
+// memory management
+
+var (
+	// Map of (pseudo-)physical addresses to machine addresses.
+	_atman_phys_to_machine_mapping [8192]uint64
+)
+
+// Entry in level 3, 2, or 1 page table.
+//
+// - 63 if set means No execute (NX)
+// - 51-13 the machine frame number
+// - 12 available for guest
+// - 11 available for guest
+// - 10 available for guest
+// - 9 available for guest
+// - 8 global
+// - 7 PAT (PSE is disabled, must use hypercall to make 4MB or 2MB pages)
+// - 6 dirty
+// - 5 accessed
+// - 4 page cached disabled
+// - 3 page write through
+// - 2 userspace accessible
+// - 1 writeable
+// - 0 present
+type pageTableEntry uintptr
+
+const (
+	xenPageTablePresent = 1 << iota
+	xenPageTableWritable
+	xenPageTableUserspaceAccessible
+	xenPageTablePageWriteThrough
+	xenPageTablePageCacheDisabled
+	xenPageTableAccessed
+	xenPageTableDirty
+	xenPageTablePAT
+	xenPageTableGlobal
+	xenPageTableGuest1
+	xenPageTableGuest2
+	xenPageTableGuest3
+	xenPageTableGuest4
+	xenPageTableNoExecute = 1 << 63
+
+	xenPageAddrMask  = 1<<52 - 1
+	xenPageMask      = 1<<12 - 1
+	xenPageFlagShift = 12
+)
+
+func (e pageTableEntry) debug() {
+	println(
+		"PTE<", unsafe.Pointer(e), ">:",
+		" MFN=", e.Mfn(),
+		"  NX=", e.hasFlag(xenPageTableNoExecute),
+		"   G=", e.hasFlag(xenPageTableGlobal),
+		" PAT=", e.hasFlag(xenPageTablePAT),
+		" DIR=", e.hasFlag(xenPageTableDirty),
+		"   A=", e.hasFlag(xenPageTableAccessed),
+		" PCD=", e.hasFlag(xenPageTablePageCacheDisabled),
+		" PWT=", e.hasFlag(xenPageTablePageWriteThrough),
+		"   U=", e.hasFlag(xenPageTableUserspaceAccessible),
+		"   W=", e.hasFlag(xenPageTableWritable),
+		"   P=", e.hasFlag(xenPageTablePresent),
+	)
+}
+
+func (e pageTableEntry) hasFlag(f uintptr) bool {
+	return uintptr(e)&f == f
+}
+
+func (e pageTableEntry) Mfn() uintptr {
+	return (uintptr(e) & (xenPageAddrMask &^ xenPageMask)) >> xenPageFlagShift
+}
+
+type (
+	xenPageDirectory [512]pageTableEntry
+	xenPageTable     [512]pageTableEntry
+)
+
+type xenMachineToPhysicalMap uintptr
+
+func (m xenMachineToPhysicalMap) Get(i uintptr) uintptr {
+	return *(*uintptr)(add(unsafe.Pointer(m), i*ptrSize))
 }
