@@ -83,11 +83,14 @@ type xenStartInfo struct {
 	NrPages        uint64
 	SharedInfoAddr uintptr // machine address of share info struct
 	SIFFlags       uint32
+	_              [4]byte
 	StoreMfn       uint64 // machine page number of shared page
 	StoreEventchn  uint32
+	_              [4]byte
 	Console        struct {
 		Mfn      uint64 // machine page number of console page
 		Eventchn uint32 // event channel
+		_        [4]byte
 	}
 	PageTableBase     uint64 // virtual address of page directory
 	NrPageTableFrames uint64
@@ -199,8 +202,9 @@ func pteToVirt(e pageTableEntry) unsafe.Pointer {
 }
 
 func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
-	pageAddr := roundUpPage(
+	pageAddr := round(
 		uintptr(unsafe.Pointer(&_atman_shared_info_page[0])),
+		_PAGESIZE,
 	)
 
 	ret := HYPERVISOR_update_va_mapping(
@@ -215,10 +219,6 @@ func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
 	}
 
 	*i = *(*xenSharedInfo)(unsafe.Pointer(pageAddr))
-}
-
-func roundUpPage(addr uintptr) uintptr {
-	return (addr + _PAGESIZE - 1) &^ (_PAGESIZE - 1)
 }
 
 func hypercall(trap, a1, a2, a3 uintptr) uintptr
