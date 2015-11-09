@@ -92,7 +92,7 @@ type xenStartInfo struct {
 		Eventchn uint32 // event channel
 		_        [4]byte
 	}
-	PageTableBase     uint64 // virtual address of page directory
+	PageTableBase     vaddr // virtual address of page directory
 	NrPageTableFrames uint64
 	MfnList           uintptr // virtual address of page-frame list
 	ModStart          uintptr // virtual address of pre-loaded module
@@ -148,6 +148,7 @@ type vcpuInfo struct {
 
 func atmaninit() {
 	println("Atman OS")
+	println("     ptr_size: ", ptrSize)
 	println("   start_info: ", _atman_start_info)
 	println("        magic: ", string(_atman_start_info.Magic[:]))
 	println("     nr_pages: ", _atman_start_info.NrPages)
@@ -176,7 +177,7 @@ func atmaninit() {
 	println("mapping _atman_start_info")
 	mapSharedInfo(_atman_start_info.SharedInfoAddr, _atman_shared_info)
 
-	// printPageDirectory()
+	buildPageTable()
 }
 
 func printPageDirectory() {
@@ -326,4 +327,38 @@ type xenMachineToPhysicalMap uintptr
 
 func (m xenMachineToPhysicalMap) Get(i uintptr) uintptr {
 	return *(*uintptr)(add(unsafe.Pointer(m), i*ptrSize))
+}
+
+type vaddr uintptr
+
+func (a vaddr) pfn() pfn {
+	const virtStart = 0x401000 // TODO: don't hard code this...
+
+	return pfn((uint64(a) - virtStart + _PAGESIZE - 1) >> 12)
+}
+
+type pfn uint64
+
+func (n pfn) vaddr() vaddr {
+	const virtStart = 0x401000 // TODO: don't hard code this...
+
+	return vaddr((n << 12) + virtStart)
+}
+
+func (n pfn) add(v uint64) pfn {
+	return n + pfn(v)
+}
+
+func buildPageTable() {
+	var (
+		basePFN  = _atman_start_info.PageTableBase.pfn()
+		startPFN = basePFN.add(_atman_start_info.NrPageTableFrames)
+		endPFN   = pfn(_atman_start_info.NrPages)
+
+		startAddress = startPFN.vaddr()
+		endAddress   = endPFN.vaddr()
+	)
+
+	println("startPFN = ", startPFN, "endPFN = ", endPFN)
+	println("startAddress = ", startAddress, "endAddress = ", endAddress)
 }
