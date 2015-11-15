@@ -222,7 +222,7 @@ func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
 	*i = *(*xenSharedInfo)(unsafe.Pointer(pageAddr))
 }
 
-func hypercall(trap, a1, a2, a3 uintptr) uintptr
+func hypercall(trap, a1, a2, a3, a4, a5, a6 uintptr) uintptr
 
 func HYPERVISOR_console_io(op uint64, size uint64, data uintptr) uintptr {
 	const _HYPERVISOR_console_io = 18
@@ -232,6 +232,9 @@ func HYPERVISOR_console_io(op uint64, size uint64, data uintptr) uintptr {
 		uintptr(op),
 		uintptr(size),
 		data,
+		0,
+		0,
+		0,
 	)
 }
 
@@ -243,6 +246,9 @@ func HYPERVISOR_update_va_mapping(vaddr uintptr, val uintptr, flags uint64) uint
 		vaddr,
 		val,
 		uintptr(flags),
+		0,
+		0,
+		0,
 	)
 }
 
