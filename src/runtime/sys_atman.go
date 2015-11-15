@@ -175,8 +175,12 @@ func atmaninit() {
 	println("mapping _atman_start_info")
 	mapSharedInfo(_atman_start_info.SharedInfoAddr, _atman_shared_info)
 
-	buildPageTable()
+	_atman_mem_start_addr, _atman_mem_end_addr = buildPageTable()
 }
+
+var (
+	_atman_mem_start_addr, _atman_mem_end_addr vaddr
+)
 
 func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
 	pageAddr := round(
@@ -420,7 +424,7 @@ func (a vaddr) pfn() pfn {
 	return pfn((uint64(a) - virtStart + _PAGESIZE - 1) >> 12)
 }
 
-func buildPageTable() {
+func buildPageTable() (start vaddr, end vaddr) {
 	var (
 		basePFN = _atman_start_info.PageTableBase.pfn()
 
@@ -431,6 +435,7 @@ func buildPageTable() {
 
 		startPFN     = basePFN.add(endAddress.requiredPageTables())
 		startAddress = startPFN.vaddr()
+		addr         = startAddress
 	)
 
 	println(
@@ -442,30 +447,30 @@ func buildPageTable() {
 		"endAddress = ", endAddress,
 	)
 
-	for startAddress < endAddress {
+	for addr < endAddress {
 		var (
-			l4offset = startAddress.pageTableOffset(pageTableLevel4)
-			l3offset = startAddress.pageTableOffset(pageTableLevel3)
-			l2offset = startAddress.pageTableOffset(pageTableLevel2)
-			l1offset = startAddress.pageTableOffset(pageTableLevel1)
+			l4offset = addr.pageTableOffset(pageTableLevel4)
+			l3offset = addr.pageTableOffset(pageTableLevel3)
+			l2offset = addr.pageTableOffset(pageTableLevel2)
+			l1offset = addr.pageTableOffset(pageTableLevel1)
 
 			l4 = newXenPageTable(_atman_start_info.PageTableBase)
 		)
 
-		if uint64(startAddress)&pageTableLevel3.mask() == 0 && !l4.Get(l4offset).hasFlag(xenPageTablePresent) {
+		if uint64(addr)&pageTableLevel3.mask() == 0 && !l4.Get(l4offset).hasFlag(xenPageTablePresent) {
 			panic("NOT YET IMPLEMENTED")
 		}
 
 		l3 := newXenPageTable(l4.Get(l4offset).vaddr())
 
-		if uint64(startAddress)&pageTableLevel2.mask() == 0 && !l3.Get(l3offset).hasFlag(xenPageTablePresent) {
+		if uint64(addr)&pageTableLevel2.mask() == 0 && !l3.Get(l3offset).hasFlag(xenPageTablePresent) {
 			panic("NOT YET IMPLEMENTED")
 		}
 
 		l2pte := l3.Get(l3offset)
 		l2 := newXenPageTable(l2pte.vaddr())
 
-		if uint64(startAddress)&pageTableLevel1.mask() == 0 && !l2pte.hasFlag(xenPageTablePresent) {
+		if uint64(addr)&pageTableLevel1.mask() == 0 && !l2pte.hasFlag(xenPageTablePresent) {
 			memclr(unsafe.Pointer(nextPFN.vaddr()), _PAGESIZE) // clear page to mapping as table
 
 			newpte := pageTableEntry(nextPFN.mfn() << xenPageFlagShift)
@@ -508,7 +513,7 @@ func buildPageTable() {
 		l1pte := l2.Get(l2offset)
 
 		{
-			newpte := pageTableEntry(startAddress.pfn().mfn() << xenPageFlagShift)
+			newpte := pageTableEntry(addr.pfn().mfn() << xenPageFlagShift)
 			newpte.setFlag(xenPageTablePresent | xenPageTableAccessed | xenPageTableUserspaceAccessible)
 
 			updates := []mmuUpdate{
@@ -526,6 +531,8 @@ func buildPageTable() {
 			}
 		}
 
-		startAddress += _PAGESIZE
+		addr += _PAGESIZE
 	}
+
+	return startAddress, endAddress
 }
