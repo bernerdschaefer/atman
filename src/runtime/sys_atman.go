@@ -333,7 +333,11 @@ func (e pageTableEntry) vaddr() vaddr {
 	return vaddr(m2p.Get(e.mfn()) << 12)
 }
 
-type xenPageTable [512]pageTableEntry
+type xenPageTable uintptr
+
+func (t xenPageTable) Get(i int) pageTableEntry {
+	return pageTableEntry(add(unsafe.Pointer(t), uintptr(i)*ptrSize))
+}
 
 func newXenPageTable(vaddr vaddr) xenPageTable {
 	return *(*xenPageTable)(unsafe.Pointer(vaddr))
@@ -443,24 +447,25 @@ func buildPageTable() {
 			l4offset = startAddress.pageTableOffset(pageTableLevel4)
 			l3offset = startAddress.pageTableOffset(pageTableLevel3)
 			l2offset = startAddress.pageTableOffset(pageTableLevel2)
-			// l1offset = startAddress.pageTableOffset(pageTableLevel1)
+			l1offset = startAddress.pageTableOffset(pageTableLevel1)
 
 			l4 = newXenPageTable(_atman_start_info.PageTableBase)
 		)
 
-		if uint64(startAddress)&pageTableLevel3.mask() == 0 && !l4[l4offset].hasFlag(xenPageTablePresent) {
+		if uint64(startAddress)&pageTableLevel3.mask() == 0 && !l4.Get(l4offset).hasFlag(xenPageTablePresent) {
 			panic("NOT YET IMPLEMENTED")
 		}
 
-		l3 := newXenPageTable(l4[l4offset].vaddr())
+		l3 := newXenPageTable(l4.Get(l4offset).vaddr())
 
-		if uint64(startAddress)&pageTableLevel2.mask() == 0 && !l3[l3offset].hasFlag(xenPageTablePresent) {
+		if uint64(startAddress)&pageTableLevel2.mask() == 0 && !l3.Get(l3offset).hasFlag(xenPageTablePresent) {
 			panic("NOT YET IMPLEMENTED")
 		}
 
-		l2 := newXenPageTable(l3[l3offset].vaddr())
+		l2pte := l3.Get(l3offset)
+		l2 := newXenPageTable(l2pte.vaddr())
 
-		if uint64(startAddress)&pageTableLevel1.mask() == 0 && !l2[l2offset].hasFlag(xenPageTablePresent) {
+		if uint64(startAddress)&pageTableLevel1.mask() == 0 && !l2pte.hasFlag(xenPageTablePresent) {
 			memclr(unsafe.Pointer(nextPFN.vaddr()), _PAGESIZE) // clear page to mapping as table
 
 			newpte := pageTableEntry(nextPFN.mfn() << xenPageFlagShift)
@@ -471,7 +476,7 @@ func buildPageTable() {
 
 			updates := []mmuUpdate{
 				{
-					ptr: uintptr((l2[pfnOffset2].mfn() << xenPageFlagShift)) + uintptr(pfnOffset1*ptrSize),
+					ptr: uintptr((l2.Get(pfnOffset2).mfn() << xenPageFlagShift)) + uintptr(pfnOffset1*ptrSize),
 					val: uintptr(newpte),
 				},
 			}
@@ -483,11 +488,44 @@ func buildPageTable() {
 				panic("HYPERVISOR_mmu_update failed")
 			}
 
+			updates = []mmuUpdate{
+				{
+					ptr: uintptr((l2pte.mfn() << xenPageFlagShift)) + uintptr(l2offset*ptrSize),
+					val: uintptr(newpte),
+				},
+			}
+
+			ret = HYPERVISOR_mmu_update(updates, DOMID_SELF)
+
+			if ret != 0 {
+				println("HYPERVISOR_mmu_update returned ", ret)
+				panic("HYPERVISOR_mmu_update failed")
+			}
+
 			nextPFN += 1
+		}
+
+		l1pte := l2.Get(l2offset)
+
+		{
+			newpte := pageTableEntry(startAddress.pfn().mfn() << xenPageFlagShift)
+			newpte.setFlag(xenPageTablePresent | xenPageTableAccessed | xenPageTableUserspaceAccessible)
+
+			updates := []mmuUpdate{
+				{
+					ptr: uintptr((l1pte.mfn() << xenPageFlagShift)) + uintptr(l1offset*ptrSize),
+					val: uintptr(newpte),
+				},
+			}
+
+			ret := HYPERVISOR_mmu_update(updates, DOMID_SELF)
+
+			if ret != 0 {
+				println("HYPERVISOR_mmu_update returned ", ret)
+				panic("HYPERVISOR_mmu_update failed")
+			}
 		}
 
 		startAddress += _PAGESIZE
 	}
-
-	println("END")
 }
