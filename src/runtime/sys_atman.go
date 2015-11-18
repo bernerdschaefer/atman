@@ -330,21 +330,29 @@ func (e pageTableEntry) mfn() mfn {
 }
 
 func (e pageTableEntry) vaddr() vaddr {
+	return vaddr(e.pfn() << xenPageFlagShift)
+}
+
+func (e pageTableEntry) pfn() pfn {
 	const (
 		m2p xenMachineToPhysicalMap = 0xFFFF800000000000
 	)
 
-	return vaddr(m2p.Get(e.mfn()) << 12)
+	return m2p.Get(e.mfn())
 }
 
 type xenPageTable uintptr
 
 func (t xenPageTable) Get(i int) pageTableEntry {
-	return pageTableEntry(add(unsafe.Pointer(t), uintptr(i)*ptrSize))
+	return *(*pageTableEntry)(add(unsafe.Pointer(t), uintptr(i)*ptrSize))
+}
+
+func (t xenPageTable) vaddr() vaddr {
+	return vaddr(t)
 }
 
 func newXenPageTable(vaddr vaddr) xenPageTable {
-	return *(*xenPageTable)(unsafe.Pointer(vaddr))
+	return xenPageTable(vaddr)
 }
 
 type xenMachineToPhysicalMap uintptr
@@ -393,9 +401,7 @@ func (a vaddr) requiredPageTables() uint64 {
 type pfn uint64
 
 func (n pfn) vaddr() vaddr {
-	const virtStart = 0x401000 // TODO: don't hard code this...
-
-	return vaddr((n << 12) + virtStart)
+	return vaddr(n << 12)
 }
 
 func (n pfn) add(v uint64) pfn {
@@ -413,15 +419,13 @@ func (m mfn) pfn() pfn {
 		m2p xenMachineToPhysicalMap = 0xFFFF800000000000
 	)
 
-	return pfn(m2p.Get(m))
+	return m2p.Get(m)
 }
 
 type vaddr uintptr
 
 func (a vaddr) pfn() pfn {
-	const virtStart = 0x401000 // TODO: don't hard code this...
-
-	return pfn((uint64(a) - virtStart + _PAGESIZE - 1) >> 12)
+	return pfn((uint64(a) + _PAGESIZE - 1) >> 12)
 }
 
 func buildPageTable() (start vaddr, end vaddr) {
