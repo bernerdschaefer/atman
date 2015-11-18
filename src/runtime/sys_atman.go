@@ -7,7 +7,6 @@ const (
 )
 
 var (
-	_atman_stack            [8 * _PAGESIZE]byte
 	_atman_hypercall_page   [2 * _PAGESIZE]byte
 	_atman_shared_info_page [2 * _PAGESIZE]byte
 
