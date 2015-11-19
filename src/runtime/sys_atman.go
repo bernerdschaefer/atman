@@ -398,18 +398,6 @@ func (a vaddr) pageTableOffset(level pageTableLevel) int {
 	return int((a >> level.shift()) & (512 - 1))
 }
 
-// requiredPageTables returns the number of page tables
-// required to map the complete address space.
-func (a vaddr) requiredPageTables() uint64 {
-	var (
-		l3tables = uint64(a)/pageTableLevel3.mask() + 1
-		l2tables = uint64(a)/pageTableLevel2.mask() + 1
-		l1tables = uint64(a)/pageTableLevel1.mask() + 1
-	)
-
-	return l3tables + l2tables + l1tables
-}
-
 type pfn uint64
 
 func (n pfn) vaddr() vaddr {
