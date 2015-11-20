@@ -248,6 +248,27 @@ func HYPERVISOR_mmu_update(updates []mmuUpdate, domid uint16) uintptr {
 	)
 }
 
+type mmuExtOp struct {
+	cmd  uint32
+	_    [4]byte
+	arg1 uint64
+	arg2 uint64
+}
+
+func HYPERVISOR_mmuext_op(ops []mmuExtOp, domid uint16) uintptr {
+	const _HYPERVISOR_mmuext_op = 26
+
+	return hypercall(
+		_HYPERVISOR_mmuext_op,
+		uintptr(unsafe.Pointer(&ops[0])),
+		uintptr(len(ops)),
+		0, // done_out (unused)
+		uintptr(domid),
+		0,
+		0,
+	)
+}
+
 // memory management
 
 var (
