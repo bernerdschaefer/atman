@@ -166,25 +166,6 @@ func atmaninit() {
 	println("    first_pfn: ", _atman_start_info.FirstP2mPfn)
 	println("nr_p2m_frames: ", _atman_start_info.NrP2mFrames)
 
-	var (
-		ptStartPfn = _atman_start_info.PageTableBase.pfn()
-		ptEndPfn   = ptStartPfn.add(_atman_start_info.NrPageTableFrames)
-
-		bootstackPfn  = ptEndPfn.add(1)
-		bootstackAddr = bootstackPfn.vaddr()
-
-		bootstrapEnd = round(
-			uintptr(bootstackAddr)+0x80000, // minimum 512kB padding
-			0x400000, // 4MB alignment
-		)
-	)
-
-	println("  pt_start_pfn:", ptStartPfn)
-	println("    pt_end_pfn:", ptEndPfn)
-	println(" bootstack_pfn:", bootstackPfn)
-	println("bootstack_addr:", unsafe.Pointer(bootstackAddr))
-	println(" bootstrap_end:", unsafe.Pointer(bootstrapEnd))
-
 	println("setting _atman_phys_to_machine_mapping")
 	_atman_phys_to_machine_mapping = *(*[8192]uint64)(unsafe.Pointer(
 		_atman_start_info.MfnList,
@@ -192,6 +173,8 @@ func atmaninit() {
 
 	println("mapping _atman_start_info")
 	mapSharedInfo(_atman_start_info.SharedInfoAddr, _atman_shared_info)
+
+	_atman_mm.init()
 }
 
 func mapSharedInfo(vaddr uintptr, i *xenSharedInfo) {
