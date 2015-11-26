@@ -148,6 +148,7 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 	)
 
 	l3pte := l4.Get(l4offset)
+	l3pte.debug()
 
 	if !l3pte.hasFlag(xenPageTablePresent) {
 		println("would need new l3 entry")
@@ -156,6 +157,7 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 
 	l3 := newXenPageTable(mm.pageTableAddr(l3pte.pfn()))
 	l2pte := l3.Get(l3offset)
+	l2pte.debug()
 
 	if !l2pte.hasFlag(xenPageTablePresent) {
 		println("would need new l2 entry")
@@ -164,6 +166,7 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 
 	l2 := newXenPageTable(mm.pageTableAddr(l2pte.pfn()))
 	l1pte := l2.Get(l2offset)
+	l1pte.debug()
 
 	if !l1pte.hasFlag(xenPageTablePresent) {
 		l1pte = mm.allocPageTable(l2pte.pfn(), l2offset)
@@ -173,18 +176,74 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 	println("Reserved pfn=", pagepfn, "mfn=", pagepfn.mfn())
 
 	mm.clearPage(pagepfn)
-	mm.writePte(l1pte.pfn(), l1offset, pagepfn, xenPageTableWritable)
+	mm.writePte(l1pte.pfn(), l1offset, pagepfn, PT_L1_FLAGS)
+	*(*uintptr)(unsafe.Pointer(page)) = 0x0 // ensure page is writable
+}
 
-	println("reading from allocated page:", *(*uintptr)(unsafe.Pointer(page)))
-	println("writing to allocated page:")
-	*(*uintptr)(unsafe.Pointer(page)) = 0x1
+func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
+	var (
+		l4offset = addr.pageTableOffset(pageTableLevel4)
+		l3offset = addr.pageTableOffset(pageTableLevel3)
+		l2offset = addr.pageTableOffset(pageTableLevel2)
+		l1offset = addr.pageTableOffset(pageTableLevel1)
+
+		l4 = mm.l4
+	)
+
+	println("page table walk from", unsafe.Pointer(addr))
+	print("L4[")
+	print(l4offset)
+	print("] = ")
+
+	l3pte := l4.Get(l4offset)
+	l3pte.debug()
+
+	if !l3pte.hasFlag(xenPageTablePresent) {
+		return
+	}
+
+	l3 := newXenPageTable(mm.pageTableAddr(l3pte.pfn()))
+	print("L3[")
+	print(l3offset)
+	print("] = ")
+
+	l2pte := l3.Get(l3offset)
+	l2pte.debug()
+
+	if !l2pte.hasFlag(xenPageTablePresent) {
+		return
+	}
+
+	l2 := newXenPageTable(mm.pageTableAddr(l2pte.pfn()))
+	print("L2[")
+	print(l2offset)
+	print("] = ")
+
+	l1pte := l2.Get(l2offset)
+	l1pte.debug()
+
+	if !l1pte.hasFlag(xenPageTablePresent) {
+		return
+	}
+
+	l1 := newXenPageTable(mm.pageTableAddr(l1pte.pfn()))
+	print("L1[")
+	print(l1offset)
+	print("] = ")
+
+	l0pte := l1.Get(l1offset)
+	l0pte.debug()
+
+	if !l0pte.hasFlag(xenPageTablePresent) {
+		return
+	}
 }
 
 // allocPageTable allocates a new L1 page table
 // and installs it into l2.
 func (mm *atmanMemoryManager) allocPageTable(prev pfn, prevOffset int) pageTableEntry {
 	pagepfn := mm.allocPageTablePage()
-	return mm.writePte(prev, prevOffset, pagepfn, 0)
+	return mm.writePte(prev, prevOffset, pagepfn, PT_L2_FLAGS|xenPageTableWritable)
 }
 
 func (mm *atmanMemoryManager) reserveHeapPages(n uint64) unsafe.Pointer {
@@ -241,7 +300,7 @@ func (mm *atmanMemoryManager) mmuExtOp(ops []mmuExtOp) {
 
 func (mm *atmanMemoryManager) writePte(table pfn, offset int, value pfn, flags uintptr) pageTableEntry {
 	newpte := pageTableEntry(value.mfn() << xenPageFlagShift)
-	newpte.setFlag(flags | xenPageTablePresent | xenPageTableUserspaceAccessible | xenPageTableDirty | xenPageTableAccessed)
+	newpte.setFlag(flags)
 
 	updates := []mmuUpdate{
 		{
@@ -297,9 +356,9 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 		println("Installing new l3")
 		l3pfn = mm.reservePFN()
 		mm.clearPage(l3pfn)
-		mm.writePte(l4pfn, l4offset, l3pfn, xenPageTableGuest1)
+		mm.writePte(l4pfn, l4offset, l3pfn, PT_L4_FLAGS|PT_TEMP)
 		mm.mapPageTablePage(l3pfn)
-		mm.writePte(l4pfn, l4offset, l3pfn, 0)
+		mm.writePte(l4pfn, l4offset, l3pfn, PT_L4_FLAGS)
 	}
 
 	if l3pte.hasFlag(xenPageTableGuest1) {
@@ -321,9 +380,9 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 		l2pfn = mm.reservePFN()
 
 		mm.clearPage(l2pfn)
-		mm.writePte(l3pfn, l3offset, l2pfn, xenPageTableGuest1)
+		mm.writePte(l3pfn, l3offset, l2pfn, PT_L3_FLAGS|PT_TEMP)
 		mm.mapPageTablePage(l2pfn)
-		mm.writePte(l3pfn, l3offset, l2pfn, 0)
+		mm.writePte(l3pfn, l3offset, l2pfn, PT_L3_FLAGS)
 	}
 
 	if l2pte.hasFlag(xenPageTableGuest1) {
@@ -345,10 +404,10 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 		l1pfn = mm.reservePFN()
 
 		mm.clearPage(l1pfn)
-		mm.writePte(l2pfn, l2offset, l1pfn, xenPageTableGuest1)
+		mm.writePte(l2pfn, l2offset, l1pfn, PT_L2_FLAGS|PT_TEMP)
 		mm.mapPageTablePage(l1pfn)
-		mm.writePte(l2pfn, l2offset, l1pfn, 0)
+		mm.writePte(l2pfn, l2offset, l1pfn, PT_L2_FLAGS)
 	}
 
-	mm.writePte(l1pfn, l1offset, pagepfn, 0)
+	mm.writePte(l1pfn, l1offset, pagepfn, PT_L2_FLAGS)
 }
