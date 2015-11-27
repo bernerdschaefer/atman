@@ -14,8 +14,13 @@ func crash() {
 
 func goenvs() {}
 
+//go:nowritebarrier
 func newosproc(mp *m, stk unsafe.Pointer) {
-	println("newosproc(m, stk)")
+	mp.tls[0] = uintptr(mp.id) // so 386 asm can find it
+	if true {
+		print("newosproc stk=", stk, " m=", mp, " g=", mp.g0, " id=", mp.id, "/", mp.tls[0], " ostk=", &mp, "\n")
+	}
+
 }
 
 func resetcpuprofiler(hz int32) {}
