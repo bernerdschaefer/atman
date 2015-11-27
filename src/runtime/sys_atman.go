@@ -295,11 +295,9 @@ const (
 	xenPageMask      = 1<<12 - 1
 	xenPageFlagShift = 12
 
-	PT_L1_FLAGS = xenPageTablePresent | xenPageTableWritable | xenPageTableUserspaceAccessible | xenPageTableAccessed
-	PT_L2_FLAGS = xenPageTablePresent | xenPageTableUserspaceAccessible | xenPageTableAccessed | xenPageTableDirty
-	PT_L3_FLAGS = xenPageTablePresent | xenPageTableUserspaceAccessible | xenPageTableAccessed | xenPageTableDirty
-	PT_L4_FLAGS = xenPageTablePresent | xenPageTableUserspaceAccessible | xenPageTableAccessed | xenPageTableDirty
-	PT_TEMP     = xenPageTableGuest1
+	PTE_PAGE_FLAGS       = xenPageTablePresent | xenPageTableWritable | xenPageTableUserspaceAccessible | xenPageTableAccessed
+	PTE_PAGE_TABLE_FLAGS = xenPageTablePresent | xenPageTableUserspaceAccessible | xenPageTableAccessed | xenPageTableDirty
+	PTE_TEMP             = xenPageTableGuest1
 )
 
 func (e pageTableEntry) debug() {

@@ -56,8 +56,7 @@ type atmanMemoryManager struct {
 	nextPFN pfn // next free frame
 	lastPFN pfn
 
-	nextHeapPage      vaddr
-	nextPageTablePage vaddr
+	nextHeapPage vaddr
 
 	l4     xenPageTable
 	l3Temp xenPageTable
@@ -92,7 +91,6 @@ func (mm *atmanMemoryManager) init() {
 	mm.lastPFN = pfn(_atman_start_info.NrPages)
 
 	mm.nextHeapPage = mm.nextPFN.vaddr()
-	mm.nextPageTablePage = vaddr(0xFFFF880000000000)
 
 	mm.l4 = newXenPageTable(mm.l4PFN.vaddr())
 	mm.l3Temp = newXenPageTable(mm.l3TempPFN.vaddr())
@@ -155,7 +153,7 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 	pagepfn := mm.reservePFN()
 
 	mm.clearPage(pagepfn)
-	mm.writePte(l1pte.pfn(), l1offset, pagepfn, PT_L1_FLAGS)
+	mm.writePte(l1pte.pfn(), l1offset, pagepfn, PTE_PAGE_FLAGS)
 	*(*uintptr)(unsafe.Pointer(page)) = 0x0 // ensure page is writable
 }
 
@@ -218,11 +216,11 @@ func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
 	}
 }
 
-// allocPageTable allocates a new L1 page table
-// and installs it into l2.
+// allocPageTable allocates a new page table
+// and installs it into previous page table.
 func (mm *atmanMemoryManager) allocPageTable(prev pfn, prevOffset int) pageTableEntry {
 	pagepfn := mm.allocPageTablePage()
-	return mm.writePte(prev, prevOffset, pagepfn, PT_L2_FLAGS|xenPageTableWritable)
+	return mm.writePte(prev, prevOffset, pagepfn, PTE_PAGE_TABLE_FLAGS|xenPageTableWritable)
 }
 
 func (mm *atmanMemoryManager) reserveHeapPages(n uint64) unsafe.Pointer {
@@ -334,9 +332,9 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 		l3pfn = mm.reservePFN()
 
 		mm.clearPage(l3pfn)
-		mm.writePte(l4pfn, l4offset, l3pfn, PT_L4_FLAGS|PT_TEMP)
+		mm.writePte(l4pfn, l4offset, l3pfn, PTE_PAGE_TABLE_FLAGS|PTE_TEMP)
 		mm.mapPageTablePage(l3pfn)
-		mm.writePte(l4pfn, l4offset, l3pfn, PT_L4_FLAGS)
+		mm.writePte(l4pfn, l4offset, l3pfn, PTE_PAGE_TABLE_FLAGS)
 	}
 
 	if l3pte.hasFlag(xenPageTableGuest1) {
@@ -356,9 +354,9 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 		l2pfn = mm.reservePFN()
 
 		mm.clearPage(l2pfn)
-		mm.writePte(l3pfn, l3offset, l2pfn, PT_L3_FLAGS|PT_TEMP)
+		mm.writePte(l3pfn, l3offset, l2pfn, PTE_PAGE_TABLE_FLAGS|PTE_TEMP)
 		mm.mapPageTablePage(l2pfn)
-		mm.writePte(l3pfn, l3offset, l2pfn, PT_L3_FLAGS)
+		mm.writePte(l3pfn, l3offset, l2pfn, PTE_PAGE_TABLE_FLAGS)
 	}
 
 	if l2pte.hasFlag(xenPageTableGuest1) {
@@ -378,10 +376,10 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 		l1pfn = mm.reservePFN()
 
 		mm.clearPage(l1pfn)
-		mm.writePte(l2pfn, l2offset, l1pfn, PT_L2_FLAGS|PT_TEMP)
+		mm.writePte(l2pfn, l2offset, l1pfn, PTE_PAGE_TABLE_FLAGS|PTE_TEMP)
 		mm.mapPageTablePage(l1pfn)
-		mm.writePte(l2pfn, l2offset, l1pfn, PT_L2_FLAGS)
+		mm.writePte(l2pfn, l2offset, l1pfn, PTE_PAGE_TABLE_FLAGS)
 	}
 
-	mm.writePte(l1pfn, l1offset, pagepfn, PT_L2_FLAGS)
+	mm.writePte(l1pfn, l1offset, pagepfn, PTE_PAGE_TABLE_FLAGS)
 }
