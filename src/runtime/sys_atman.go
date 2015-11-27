@@ -42,26 +42,6 @@ func gogetenv(key string) string { return "" }
 var _cgo_setenv unsafe.Pointer   // pointer to C function
 var _cgo_unsetenv unsafe.Pointer // pointer to C function
 
-// os
-
-func sigpanic() {}
-func crash()    {}
-func goenvs()   {}
-
-func newosproc(mp *m, stk unsafe.Pointer) {}
-
-func resetcpuprofiler(hz int32) {}
-
-func minit()         {}
-func unminit()       {}
-func mpreinit(mp *m) {}
-func msigsave(mp *m) {}
-
-//go:nosplit
-func osyield() {}
-
-func osinit() {}
-
 // signals
 
 const _NSIG = 0
