@@ -10,8 +10,6 @@ func sysFault(v unsafe.Pointer, n uintptr)  {}
 
 // sysMap makes n bytes at v readable and writable and adjusts the stats.
 func sysMap(v unsafe.Pointer, n uintptr, reserved bool, sysStat *uint64) {
-	println("sysMap(", v, ",", n, ",", reserved, ", ...)")
-
 	mSysStatInc(sysStat, n)
 	p := memAlloc(v, n)
 	if p != v {
@@ -22,8 +20,6 @@ func sysMap(v unsafe.Pointer, n uintptr, reserved bool, sysStat *uint64) {
 // sysAlloc allocates n bytes, adjusts sysStat, and returns the address
 // of the allocated bytes.
 func sysAlloc(n uintptr, sysStat *uint64) unsafe.Pointer {
-	println("sysAlloc(", n, ",", ", ...)")
-
 	p := memAlloc(nil, n)
 	if p != nil {
 		mSysStatInc(sysStat, n)
@@ -33,8 +29,6 @@ func sysAlloc(n uintptr, sysStat *uint64) unsafe.Pointer {
 
 // sysReserve reserves n bytes at v and updates reserved.
 func sysReserve(v unsafe.Pointer, n uintptr, reserved *bool) unsafe.Pointer {
-	println("sysReserve(", v, ",", n, ", ...)")
-
 	*reserved = false
 	return v
 }
@@ -120,7 +114,6 @@ func (mm *atmanMemoryManager) allocPages(v unsafe.Pointer, n uint64) unsafe.Poin
 		v = mm.reserveHeapPages(n)
 	}
 
-	println("Requested allocation of", n, "pages at", v)
 	for page := vaddr(v); page < vaddr(v)+vaddr(n*_PAGESIZE); page += _PAGESIZE {
 		mm.allocPage(page)
 	}
@@ -139,41 +132,27 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 		l4 = mm.l4
 	)
 
-	println(
-		"allocPage", unsafe.Pointer(page),
-		"L4=", l4offset,
-		"L3=", l3offset,
-		"L2=", l2offset,
-		"L1=", l1offset,
-	)
-
 	l3pte := l4.Get(l4offset)
-	l3pte.debug()
 
 	if !l3pte.hasFlag(xenPageTablePresent) {
-		println("would need new l3 entry")
-		return
+		l3pte = mm.allocPageTable(mm.l4PFN, l4offset)
 	}
 
 	l3 := newXenPageTable(mm.pageTableAddr(l3pte.pfn()))
 	l2pte := l3.Get(l3offset)
-	l2pte.debug()
 
 	if !l2pte.hasFlag(xenPageTablePresent) {
-		println("would need new l2 entry")
-		return
+		l2pte = mm.allocPageTable(l3pte.pfn(), l3offset)
 	}
 
 	l2 := newXenPageTable(mm.pageTableAddr(l2pte.pfn()))
 	l1pte := l2.Get(l2offset)
-	l1pte.debug()
 
 	if !l1pte.hasFlag(xenPageTablePresent) {
 		l1pte = mm.allocPageTable(l2pte.pfn(), l2offset)
 	}
 
 	pagepfn := mm.reservePFN()
-	println("Reserved pfn=", pagepfn, "mfn=", pagepfn.mfn())
 
 	mm.clearPage(pagepfn)
 	mm.writePte(l1pte.pfn(), l1offset, pagepfn, PT_L1_FLAGS)
@@ -265,7 +244,6 @@ func (mm *atmanMemoryManager) migrateBootstrapPageTables() {
 	// step 1: make PML4 (page map level 4) reachable from high address
 	var pml4addr = mm.pageTableAddr(mm.bootstrapPageTablePFN)
 
-	println("Installing PML4 at", unsafe.Pointer(pml4addr))
 	mm.mapPageTablePage(mm.bootstrapPageTablePFN)
 	mm.l4 = newXenPageTable(pml4addr)
 
@@ -353,8 +331,8 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 	)
 
 	if !l3pte.hasFlag(xenPageTablePresent) {
-		println("Installing new l3")
 		l3pfn = mm.reservePFN()
+
 		mm.clearPage(l3pfn)
 		mm.writePte(l4pfn, l4offset, l3pfn, PT_L4_FLAGS|PT_TEMP)
 		mm.mapPageTablePage(l3pfn)
@@ -363,7 +341,6 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 
 	if l3pte.hasFlag(xenPageTableGuest1) {
 		// we're in the process of mapping this page
-		println("Temporarily mapping l3")
 		HYPERVISOR_update_va_mapping(uintptr(mm.l3TempPFN.vaddr()), uintptr(l3pte), 2)
 		l3 = mm.l3Temp
 	} else {
@@ -376,7 +353,6 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 	)
 
 	if !l2pte.hasFlag(xenPageTablePresent) {
-		println("Installing new l2")
 		l2pfn = mm.reservePFN()
 
 		mm.clearPage(l2pfn)
@@ -387,7 +363,6 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 
 	if l2pte.hasFlag(xenPageTableGuest1) {
 		// we're in the process of mapping this page
-		println("Temporarily mapping l2")
 		HYPERVISOR_update_va_mapping(uintptr(mm.l2TempPFN.vaddr()), uintptr(l2pte), 2)
 		l2 = mm.l2Temp
 	} else {
@@ -400,7 +375,6 @@ func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
 	)
 
 	if !l1pte.hasFlag(xenPageTablePresent) {
-		println("Installing new l1")
 		l1pfn = mm.reservePFN()
 
 		mm.clearPage(l1pfn)
