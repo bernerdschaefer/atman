@@ -20,7 +20,6 @@ func newosproc(mp *m, stk unsafe.Pointer) {
 	if true {
 		print("newosproc stk=", stk, " m=", mp, " g=", mp.g0, " id=", mp.id, "/", mp.tls[0], " ostk=", &mp, "\n")
 	}
-
 }
 
 func resetcpuprofiler(hz int32) {}
@@ -34,11 +33,11 @@ func unminit() {
 }
 
 func mpreinit(mp *m) {
-	println("mpreinit(m)")
+	print("mpreinit(", unsafe.Pointer(mp), ")", "\n")
 }
 
 func msigsave(mp *m) {
-	println("msigsave(m)")
+	print("msigsave(", unsafe.Pointer(mp), ")", "\n")
 }
 
 //go:nosplit
@@ -60,11 +59,13 @@ func semacreate() uintptr {
 // Return 0 if the semaphore was acquired, -1 if interrupted or timed out.
 //go:nosplit
 func semasleep(ns int64) int32 {
+	print("semasleep(", ns, ")", "\n")
 	return 0
 }
 
 // Wake up mp, which is or will soon be sleeping on mp->waitsema.
 //go:nosplit
 func semawakeup(mp *m) int32 {
+	print("semawakeup(", unsafe.Pointer(mp), ")", "\n")
 	return 0
 }
