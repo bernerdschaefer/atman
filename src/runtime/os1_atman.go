@@ -20,6 +20,15 @@ func newosproc(mp *m, stk unsafe.Pointer) {
 	if true {
 		print("newosproc stk=", stk, " m=", mp, " g=", mp.g0, " id=", mp.id, "/", mp.tls[0], " ostk=", &mp, "\n")
 	}
+
+	taskcreate(
+		unsafe.Pointer(mp),
+		unsafe.Pointer(mp.g0),
+		unsafe.Pointer(funcPC(mstart)),
+		stk,
+	)
+
+	taskyield()
 }
 
 func resetcpuprofiler(hz int32) {}
