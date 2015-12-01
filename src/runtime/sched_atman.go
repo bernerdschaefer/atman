@@ -73,13 +73,12 @@ func taskyield() {
 }
 
 func taskswitch() {
-	t := taskrunqueue.Head
-	taskrunqueue.Remove(t)
-	t.Ready = false
+	taskprev := taskcurrent
+	taskcurrent = taskrunqueue.Head
+	taskrunqueue.Remove(taskcurrent)
+	taskcurrent.Ready = false
 
-	contextswitch(&taskcurrent.Context, &t.Context)
-
-	// anything else?
+	contextswitch(&taskprev.Context, &taskcurrent.Context)
 }
 
 func taskexit() {
