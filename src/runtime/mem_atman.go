@@ -97,8 +97,18 @@ func (mm *atmanMemoryManager) init() {
 	mm.l2Temp = newXenPageTable(mm.l2TempPFN.vaddr())
 	mm.l1Temp = newXenPageTable(mm.l1TempPFN.vaddr())
 
+	mm.unmapLowAddresses()
 	mm.zeroTempPageTables()
 	mm.migrateBootstrapPageTables()
+}
+
+func (mm *atmanMemoryManager) unmapLowAddresses() {
+	addr := 0
+
+	for addr < 0x40000 {
+		HYPERVISOR_update_va_mapping(uintptr(addr), 0, 2)
+		addr += _PAGESIZE
+	}
 }
 
 func (mm *atmanMemoryManager) zeroTempPageTables() {
