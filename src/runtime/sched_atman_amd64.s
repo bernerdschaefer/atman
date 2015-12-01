@@ -36,14 +36,18 @@ TEXT ·contextsave(SB),NOSPLIT,$0-8
 	MOVQ	ctx+0(FP), DI
 	MOVQ	(SP), CX
 	MOVQ	CX, 128(DI)	// save ip to rip
-	MOVQ	8(SP), CX
-	MOVQ	CX, 152(DI)	// save sp to rsp
-	get_tls(CX)
-	MOVQ	CX, 184(DI)	// save tls
+	MOVQ	SP, 152(DI)	// save sp to rsp
+
+	MOVQ	$0xc0000100, CX	// MSR_FS_BASE
+	RDMSR
+	SHLQ	$32, DX	// DX <<= 32
+	ADDQ	DX, AX	// AX = DX + AX
+	MOVQ	AX, 184(DI)	// save tls
+
 	RET
 
 // func contextload(*Context)
-TEXT ·contextload(SB),NOSPLIT,$0
+TEXT ·contextload(SB),NOSPLIT,$0-8
 	MOVQ	ctx+0(FP), DI
 	MOVQ	152(DI), R8	// save sp
 	MOVQ	128(DI), R9	// save ip
