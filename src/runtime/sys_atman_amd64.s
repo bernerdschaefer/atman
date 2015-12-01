@@ -33,7 +33,7 @@ TEXT time·now(SB),NOSPLIT,$16
 	RET
 
 // set tls base to DI
-TEXT runtime·settls(SB),NOSPLIT,$32
+TEXT runtime·settls(SB),NOSPLIT,$0
 	MOVQ	DI, CX
 	MOVQ	$0, DI	// SEGBASE_FS
 	MOVQ	CX, SI	// TLS address

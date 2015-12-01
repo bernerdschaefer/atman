@@ -33,17 +33,17 @@ type Task struct {
 // executing the argumentless function fn
 // on the provided stack stk
 func taskcreate(mp, g0, fn, stk unsafe.Pointer) {
-	// write fn to stack
-	*(*uintptr)(stk) = uintptr(fn)
-	stk = add(stk, ptrSize)
-
-	// write mp to stack
-	*(*uintptr)(stk) = uintptr(mp)
-	stk = add(stk, ptrSize)
-
-	// write g0 to stack
+	stk = unsafe.Pointer(uintptr(stk))
 	*(*uintptr)(stk) = uintptr(g0)
-	stk = add(stk, ptrSize)
+
+	stk = unsafe.Pointer(uintptr(stk) - 8)
+	*(*uintptr)(stk) = uintptr(mp)
+
+	stk = unsafe.Pointer(uintptr(stk) - 8)
+	*(*uintptr)(stk) = uintptr(fn)
+
+	// reserve 8 bytes of space
+	stk = unsafe.Pointer(uintptr(stk) - 8)
 
 	t := &Task{
 		ID: taskid,

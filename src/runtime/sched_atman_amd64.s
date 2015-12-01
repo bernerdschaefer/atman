@@ -3,10 +3,10 @@
 #include "textflag.h"
 
 // func taskstart(fn, mp, gp unsafe.Pointer)
-TEXT ·taskstart(SB),NOSPLIT,$0-16
-	MOVQ	fn+16(FP), R12
-	MOVQ	mp+8(FP), R8
-	MOVQ	gp+0(FP), R9
+TEXT ·taskstart(SB),NOSPLIT,$0
+	MOVQ	(SP), R12
+	MOVQ	8(SP), R8
+	MOVQ	16(SP), R9
 
 	// set m->procid to current task ID
 	MOVQ	$runtime·taskcurrent(SB), BX
@@ -43,12 +43,12 @@ TEXT ·contextsave(SB),NOSPLIT,$0-8
 	RET
 
 // func contextload(*Context)
-TEXT ·contextload(SB),NOSPLIT,$0-8
+TEXT ·contextload(SB),NOSPLIT,$0
 	MOVQ	ctx+0(FP), DI
-	MOVQ	128(DI), CX
-	MOVQ	CX, 0(SP)	// restore sp
-	MOVQ	158(DI), CX
-	MOVQ	CX, 0(SP)	// restore ip
+	MOVQ	152(DI), R8	// save sp
+	MOVQ	128(DI), R9	// save ip
 	MOVQ	184(DI), DI
 	CALL	runtime·settls(SB) // restore tls
+	MOVQ	R8, SP
+	MOVQ	R9, (SP) // set return address
 	RET
