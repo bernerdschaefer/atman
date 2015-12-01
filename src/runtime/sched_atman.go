@@ -121,6 +121,16 @@ func (l *TaskList) Remove(t *Task) {
 // for saving or restoring a task's execution context.
 type Context cpuRegisters
 
+func (c *Context) debug() {
+	print(
+		"Context{",
+		"rsp=", unsafe.Pointer(c.rsp),
+		" rip=", unsafe.Pointer(c.rip),
+		" fs=", unsafe.Pointer(c.fs),
+		"}", "\n",
+	)
+}
+
 func contextswitch(from, to *Context) {
 	contextsave(from)
 	contextload(to)
