@@ -33,7 +33,13 @@ type Task struct {
 // executing the argumentless function fn
 // on the provided stack stk
 func taskcreate(mp, g0, fn, stk unsafe.Pointer) {
-	stk = unsafe.Pointer(uintptr(stk))
+	// reserve stack space to create Task.
+	taskSize := unsafe.Sizeof(Task{})
+	stk = unsafe.Pointer(uintptr(stk) - taskSize)
+	memclr(stk, taskSize)
+	t := (*Task)(unsafe.Pointer(stk))
+
+	stk = unsafe.Pointer(uintptr(stk) - 8)
 	*(*uintptr)(stk) = uintptr(g0)
 
 	stk = unsafe.Pointer(uintptr(stk) - 8)
@@ -45,12 +51,10 @@ func taskcreate(mp, g0, fn, stk unsafe.Pointer) {
 	// reserve 8 bytes of space
 	stk = unsafe.Pointer(uintptr(stk) - 8)
 
-	t := &Task{
-		ID: taskid,
-		Context: Context{
-			rsp: uintptr(stk),
-			rip: funcPC(taskstart),
-		},
+	t.ID = taskid
+	t.Context = Context{
+		rsp: uintptr(stk),
+		rip: funcPC(taskstart),
 	}
 
 	taskid++
@@ -78,6 +82,7 @@ func taskswitch() {
 	taskrunqueue.Remove(taskcurrent)
 	taskcurrent.Ready = false
 
+	println("switching from", taskprev.ID, "to", taskcurrent.ID)
 	contextswitch(&taskprev.Context, &taskcurrent.Context)
 }
 
@@ -131,11 +136,14 @@ func (c *Context) debug() {
 }
 
 func contextswitch(from, to *Context) {
-	contextsave(from)
-	contextload(to)
+	if contextsave(from) == 0 {
+		from.debug()
+		to.debug()
+		contextload(to)
+	}
 }
 
-func contextsave(*Context)
+func contextsave(*Context) int
 func contextload(*Context)
 
 // cpuRegisters describes the state of a CPU

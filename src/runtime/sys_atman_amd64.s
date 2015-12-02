@@ -20,6 +20,7 @@ TEXT runtime·exit(SB),NOSPLIT,$0-4
 	RET
 
 TEXT runtime·usleep(SB),NOSPLIT,$16
+	CALL	runtime·taskyield(SB)
 	RET
 
 TEXT runtime·nanotime(SB),NOSPLIT,$16

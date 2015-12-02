@@ -31,7 +31,7 @@ TEXT ·taskstart(SB),NOSPLIT,$0
 
 	RET // unreachable
 
-// func contextsave(*Context)
+// func contextsave(*Context) int
 TEXT ·contextsave(SB),NOSPLIT,$0-8
 	MOVQ	ctx+0(FP), DI
 	MOVQ	(SP), CX
@@ -44,6 +44,7 @@ TEXT ·contextsave(SB),NOSPLIT,$0-8
 	ADDQ	DX, AX	// AX = DX + AX
 	MOVQ	AX, 184(DI)	// save tls
 
+	MOVQ	$0, 16(SP)
 	RET
 
 // func contextload(*Context)
@@ -54,5 +55,5 @@ TEXT ·contextload(SB),NOSPLIT,$0-8
 	MOVQ	184(DI), DI
 	CALL	runtime·settls(SB) // restore tls
 	MOVQ	R8, SP
-	MOVQ	R9, (SP) // set return address
+	MOVQ	R9, (SP)	// set return address
 	RET
