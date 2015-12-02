@@ -13,10 +13,13 @@
 	ADDQ	CX, BX					\
 	CALL_RBX                                        \
 
-TEXT runtime·exit(SB),NOSPLIT,$0-4
-	MOVL	code+0(FP), DI
-	MOVL	$231, AX	// exitgroup - force all os threads to exit
-	SYSCALL
+TEXT runtime·exit(SB),NOSPLIT,$8-4
+retry:
+	MOVQ	$2, DI	// SCHEDOP_shutdown
+	MOVQ	$0, (SP)
+	MOVQ	SP, SI	// *reason (0 SHUTDOWN_poweroff)
+	HYPERCALL($29)
+	JMP	retry
 	RET
 
 TEXT runtime·usleep(SB),NOSPLIT,$16

@@ -59,7 +59,6 @@ func osyield() {
 // so be sure to return a non-zero value.
 //go:nosplit
 func semacreate() uintptr {
-	println("semacreate()")
 	return 1
 }
 
@@ -69,12 +68,70 @@ func semacreate() uintptr {
 //go:nosplit
 func semasleep(ns int64) int32 {
 	print("semasleep(", ns, ")", "\n")
-	return 0
+	_g_ := getg()
+
+	for {
+		if _g_.m.waitsemacount > 0 {
+			_g_.m.waitsemacount--
+			return 0 // semaphore acquired
+		}
+
+		a := uintptr(unsafe.Pointer(&_g_.m.waitsemacount))
+		key := int(a & 511) // TODO: hash address
+		s := &sleeptable[key]
+
+		s.qlock.lock()
+		s.waiting.Add(taskcurrent)
+		s.qlock.unlock()
+		taskswitch()
+	}
 }
 
 // Wake up mp, which is or will soon be sleeping on mp->waitsema.
 //go:nosplit
 func semawakeup(mp *m) int32 {
 	print("semawakeup(", unsafe.Pointer(mp), ")", "\n")
+	crash()
 	return 0
+}
+
+var (
+	sleeptable [512]sema
+	sleeplocks [512]qlock
+)
+
+type qlock struct {
+	owner   *Task
+	waiting TaskList
+}
+
+func (l *qlock) lock() {
+	if l.owner == nil {
+		l.owner = taskcurrent
+		return
+	}
+
+	l.waiting.Add(taskcurrent)
+	taskswitch()
+}
+
+func (l *qlock) unlock() {
+	ready := l.waiting.Head
+	l.owner = ready
+
+	if ready != nil {
+		l.waiting.Remove(ready)
+		taskready(ready)
+	}
+}
+
+type sema struct {
+	qlock   *qlock
+	waiting TaskList
+}
+
+func init() {
+	for i := 0; i < 512; i++ {
+		sleeptable[i].qlock = &sleeplocks[i]
+	}
 }
