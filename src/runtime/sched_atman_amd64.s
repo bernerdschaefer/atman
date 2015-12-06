@@ -2,11 +2,11 @@
 #include "go_tls.h"
 #include "textflag.h"
 
-// func taskstart(fn, mp, gp unsafe.Pointer)
-TEXT ·taskstart(SB),NOSPLIT,$0
+// func taskstart(fn, _, mp, gp unsafe.Pointer)
+TEXT ·taskstart(SB),NOSPLIT,$0-24
 	MOVQ	(SP), R12
-	MOVQ	8(SP), R8
-	MOVQ	16(SP), R9
+	MOVQ	16(SP), R8
+	MOVQ	24(SP), R9
 
 	// set m->procid to current task ID
 	MOVQ	$runtime·taskcurrent(SB), BX
@@ -32,7 +32,7 @@ TEXT ·taskstart(SB),NOSPLIT,$0
 	RET // unreachable
 
 // func contextsave(*Context) int
-TEXT ·contextsave(SB),NOSPLIT,$0-8
+TEXT ·contextsave(SB),NOSPLIT,$0-16
 	MOVQ	ctx+0(FP), DI
 	MOVQ	(SP), CX
 	MOVQ	CX, 128(DI)	// save ip to rip
@@ -44,7 +44,7 @@ TEXT ·contextsave(SB),NOSPLIT,$0-8
 	ADDQ	DX, AX	// AX = DX + AX
 	MOVQ	AX, 184(DI)	// save tls
 
-	MOVQ	$0, 16(SP)
+	MOVQ	$0, ret+8(FP)
 	RET
 
 // func contextload(*Context)
@@ -56,4 +56,5 @@ TEXT ·contextload(SB),NOSPLIT,$0-8
 	CALL	runtime·settls(SB) // restore tls
 	MOVQ	R8, SP
 	MOVQ	R9, (SP)	// set return address
+	MOVQ	$1, 16(SP)	// set return value
 	RET

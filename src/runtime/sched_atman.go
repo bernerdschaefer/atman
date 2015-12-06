@@ -33,11 +33,17 @@ type Task struct {
 // executing the argumentless function fn
 // on the provided stack stk
 func taskcreate(mp, g0, fn, stk unsafe.Pointer) {
+	// create hole in stack
+	stk = unsafe.Pointer(uintptr(stk) - 64)
+
 	// reserve stack space to create Task.
 	taskSize := unsafe.Sizeof(Task{})
 	stk = unsafe.Pointer(uintptr(stk) - taskSize)
 	memclr(stk, taskSize)
 	t := (*Task)(unsafe.Pointer(stk))
+
+	// create hole in stack
+	stk = unsafe.Pointer(uintptr(stk) - 64)
 
 	stk = unsafe.Pointer(uintptr(stk) - 8)
 	*(*uintptr)(stk) = uintptr(g0)
@@ -45,10 +51,15 @@ func taskcreate(mp, g0, fn, stk unsafe.Pointer) {
 	stk = unsafe.Pointer(uintptr(stk) - 8)
 	*(*uintptr)(stk) = uintptr(mp)
 
+	// reserve 8 bytes of space for return value,
+	// for calling compatibility with contextsave.
+	stk = unsafe.Pointer(uintptr(stk) - 8)
+
 	stk = unsafe.Pointer(uintptr(stk) - 8)
 	*(*uintptr)(stk) = uintptr(fn)
 
-	// reserve 8 bytes of space
+	// reserve 8 bytes of space for return address,
+	// to be filled in by contextload.
 	stk = unsafe.Pointer(uintptr(stk) - 8)
 
 	t.ID = taskid
@@ -64,7 +75,7 @@ func taskcreate(mp, g0, fn, stk unsafe.Pointer) {
 }
 
 //go:nosplit
-func taskstart(fn, mp, gp unsafe.Pointer)
+func taskstart(fn, _, mp, gp unsafe.Pointer)
 
 func taskready(t *Task) {
 	t.Ready = true
