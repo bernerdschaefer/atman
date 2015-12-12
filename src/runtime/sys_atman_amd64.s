@@ -26,10 +26,11 @@ TEXT runtime·usleep(SB),NOSPLIT,$16
 	CALL	runtime·taskyield(SB)
 	RET
 
-TEXT runtime·nanotime(SB),NOSPLIT,$16
+TEXT runtime·write(SB),NOSPLIT,$0-28
 	RET
 
-TEXT runtime·write(SB),NOSPLIT,$0-28
+// func nanotime() int64
+TEXT runtime·nanotime(SB),NOSPLIT,$8
 	RET
 
 // func now() (sec int64, nsec int32)
