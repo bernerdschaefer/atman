@@ -45,23 +45,16 @@ func memAlloc(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 var _atman_mm = &atmanMemoryManager{}
 
 type atmanMemoryManager struct {
-	bootstrapPageTablePFN pfn // start of bootstrap page tables
-	bootstrapStackPFN     pfn // start of bootstrap stack
-	l4PFN                 pfn
-	l3TempPFN             pfn // staging area for allocating page tables
-	l2TempPFN             pfn
-	l1TempPFN             pfn
-	bootstrapEndPFN       pfn // end of bootstrap region
+	bootstrapStackPFN pfn // start of bootstrap stack
+	bootstrapEndPFN   pfn // end of bootstrap region
 
 	nextPFN pfn // next free frame
 	lastPFN pfn
 
 	nextHeapPage vaddr
 
-	l4     xenPageTable
-	l3Temp xenPageTable
-	l2Temp xenPageTable
-	l1Temp xenPageTable
+	l4PFN pfn
+	l4    xenPageTable
 }
 
 func (mm *atmanMemoryManager) init() {
@@ -80,26 +73,18 @@ func (mm *atmanMemoryManager) init() {
 		bootstrapEndPFN = vaddr(bootstrapEnd).pfn()
 	)
 
-	mm.bootstrapPageTablePFN = _atman_start_info.PageTableBase.pfn()
 	mm.bootstrapStackPFN = bootstrapStackPFN
-	mm.l4PFN = pageTableBase.pfn()
-	mm.l3TempPFN = bootstrapEndPFN - 3
-	mm.l2TempPFN = bootstrapEndPFN - 2
-	mm.l1TempPFN = bootstrapEndPFN - 1
 	mm.bootstrapEndPFN = bootstrapEndPFN
 	mm.nextPFN = bootstrapEndPFN.add(1)
 	mm.lastPFN = pfn(_atman_start_info.NrPages)
 
 	mm.nextHeapPage = mm.nextPFN.vaddr()
 
-	mm.l4 = newXenPageTable(mm.l4PFN.vaddr())
-	mm.l3Temp = newXenPageTable(mm.l3TempPFN.vaddr())
-	mm.l2Temp = newXenPageTable(mm.l2TempPFN.vaddr())
-	mm.l1Temp = newXenPageTable(mm.l1TempPFN.vaddr())
+	mm.l4PFN = pageTableBase.pfn()
+	mm.l4 = mm.mapL4(mm.l4PFN)
 
 	mm.unmapLowAddresses()
-	mm.zeroTempPageTables()
-	mm.migrateBootstrapPageTables()
+	mm.unmapBootstrapPageTables()
 }
 
 func (mm *atmanMemoryManager) unmapLowAddresses() {
@@ -109,12 +94,6 @@ func (mm *atmanMemoryManager) unmapLowAddresses() {
 		HYPERVISOR_update_va_mapping(uintptr(addr), 0, 2)
 		addr += _PAGESIZE
 	}
-}
-
-func (mm *atmanMemoryManager) zeroTempPageTables() {
-	memclr(unsafe.Pointer(mm.l3TempPFN.vaddr()), _PAGESIZE)
-	memclr(unsafe.Pointer(mm.l2TempPFN.vaddr()), _PAGESIZE)
-	memclr(unsafe.Pointer(mm.l1TempPFN.vaddr()), _PAGESIZE)
 }
 
 func (mm *atmanMemoryManager) allocPages(v unsafe.Pointer, n uint64) unsafe.Pointer {
@@ -136,35 +115,63 @@ func (mm *atmanMemoryManager) allocPage(page vaddr) {
 		l3offset = page.pageTableOffset(pageTableLevel3)
 		l2offset = page.pageTableOffset(pageTableLevel2)
 		l1offset = page.pageTableOffset(pageTableLevel1)
-
-		l4 = mm.l4
 	)
 
+	l4 := mm.l4
 	l3pte := l4.Get(l4offset)
 
 	if !l3pte.hasFlag(xenPageTablePresent) {
-		l3pte = mm.allocPageTable(mm.l4PFN, l4offset)
+		pfn := mm.physAllocPage()
+		l3pte = mm.writePte(mm.l4PFN, l4offset, pfn, PTE_PAGE_TABLE_FLAGS|xenPageTableWritable)
 	}
 
-	l3 := newXenPageTable(mm.pageTableAddr(l3pte.pfn()))
+	l3 := mm.getPageTable(-1, -1, l4offset)
 	l2pte := l3.Get(l3offset)
 
 	if !l2pte.hasFlag(xenPageTablePresent) {
-		l2pte = mm.allocPageTable(l3pte.pfn(), l3offset)
+		pfn := mm.physAllocPage()
+		l2pte = mm.writePte(l3pte.pfn(), l3offset, pfn, PTE_PAGE_TABLE_FLAGS|xenPageTableWritable)
 	}
 
-	l2 := newXenPageTable(mm.pageTableAddr(l2pte.pfn()))
+	l2 := mm.getPageTable(-1, l4offset, l3offset)
 	l1pte := l2.Get(l2offset)
 
 	if !l1pte.hasFlag(xenPageTablePresent) {
-		l1pte = mm.allocPageTable(l2pte.pfn(), l2offset)
+		pfn := mm.physAllocPage()
+		l1pte = mm.writePte(l2pte.pfn(), l2offset, pfn, PTE_PAGE_TABLE_FLAGS|xenPageTableWritable)
 	}
 
-	pagepfn := mm.reservePFN()
-
-	mm.clearPage(pagepfn)
+	pagepfn := mm.physAllocPage()
 	mm.writePte(l1pte.pfn(), l1offset, pagepfn, PTE_PAGE_FLAGS)
-	*(*uintptr)(unsafe.Pointer(page)) = 0x0 // ensure page is writable
+
+	// ensure page is writable
+	*(*uintptr)(unsafe.Pointer(page)) = 0x0
+}
+
+func (mm *atmanMemoryManager) getPageTable(a, b, c int) xenPageTable {
+	const pageTableVaddrOffset = vaddr(0xFFFFFF8000000000)
+
+	if a == -1 {
+		a = 511
+	}
+
+	if b == -1 {
+		b = 511
+	}
+
+	if c == -1 {
+		c = 511
+	}
+
+	addr := pageTableVaddrOffset + vaddr(a<<30) + vaddr(b<<21) + vaddr(c<<12)
+
+	return newXenPageTable(addr)
+}
+
+func (mm *atmanMemoryManager) physAllocPage() pfn {
+	pfn := mm.reservePFN()
+	mm.clearPage(pfn)
+	return pfn
 }
 
 func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
@@ -189,7 +196,7 @@ func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
 		return
 	}
 
-	l3 := newXenPageTable(mm.pageTableAddr(l3pte.pfn()))
+	l3 := mm.getPageTable(-1, -1, l4offset)
 	print("L3[")
 	print(l3offset)
 	print("] = ")
@@ -201,7 +208,7 @@ func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
 		return
 	}
 
-	l2 := newXenPageTable(mm.pageTableAddr(l2pte.pfn()))
+	l2 := mm.getPageTable(-1, l4offset, l3offset)
 	print("L2[")
 	print(l2offset)
 	print("] = ")
@@ -213,7 +220,7 @@ func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
 		return
 	}
 
-	l1 := newXenPageTable(mm.pageTableAddr(l1pte.pfn()))
+	l1 := mm.getPageTable(l4offset, l3offset, l2offset)
 	print("L1[")
 	print(l1offset)
 	print("] = ")
@@ -224,13 +231,6 @@ func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
 	if !l0pte.hasFlag(xenPageTablePresent) {
 		return
 	}
-}
-
-// allocPageTable allocates a new page table
-// and installs it into previous page table.
-func (mm *atmanMemoryManager) allocPageTable(prev pfn, prevOffset int) pageTableEntry {
-	pagepfn := mm.allocPageTablePage()
-	return mm.writePte(prev, prevOffset, pagepfn, PTE_PAGE_TABLE_FLAGS|xenPageTableWritable)
 }
 
 func (mm *atmanMemoryManager) reserveHeapPages(n uint64) unsafe.Pointer {
@@ -245,24 +245,18 @@ func (mm *atmanMemoryManager) reservePFN() pfn {
 	return p
 }
 
-// migrateBootstrapPageTables relocates the bootstrap page tables
-// into the linear-mapped upper region of memory used by atman
-// to store page tables.
-func (mm *atmanMemoryManager) migrateBootstrapPageTables() {
-	// step 1: make PML4 (page map level 4) reachable from high address
-	var pml4addr = mm.pageTableAddr(mm.bootstrapPageTablePFN)
+// mapL4 sets up recursively mapped page table
+// from the initial bootstrap page tables.
+func (mm *atmanMemoryManager) mapL4(pfn pfn) xenPageTable {
+	mm.writePte(pfn, 511, pfn, PTE_PAGE_TABLE_FLAGS)
 
-	mm.mapPageTablePage(mm.bootstrapPageTablePFN)
-	mm.l4 = newXenPageTable(pml4addr)
+	return mm.getPageTable(-1, -1, -1)
+}
 
-	// now make the remaining page tables reachable
-	for i := uint64(1); i < _atman_start_info.NrPageTableFrames; i++ {
-		mm.mapPageTablePage(mm.bootstrapPageTablePFN.add(i))
-	}
-
-	// now unmap the old page table pages
-	for i := uint64(1); i < _atman_start_info.NrPageTableFrames; i++ {
-		addr := mm.bootstrapPageTablePFN.add(i).vaddr()
+// unmapBootstrapPageTables removes the bootstrap page table mappings.
+func (mm *atmanMemoryManager) unmapBootstrapPageTables() {
+	for i := uint64(0); i < _atman_start_info.NrPageTableFrames; i++ {
+		addr := mm.l4PFN.add(i).vaddr()
 		HYPERVISOR_update_va_mapping(uintptr(addr), 0, 2)
 	}
 }
@@ -301,95 +295,4 @@ func (mm *atmanMemoryManager) writePte(table pfn, offset int, value pfn, flags u
 	}
 
 	return newpte
-}
-
-func (mm *atmanMemoryManager) pageTableAddr(pfn pfn) vaddr {
-	const pageTableVaddrOffset = vaddr(0xFFFF880000000000)
-
-	return pageTableVaddrOffset + pfn.vaddr()
-}
-
-// allocPageTablePage maps a new page in the page table address space
-// and makes it read-only.
-func (mm *atmanMemoryManager) allocPageTablePage() pfn {
-	pfn := mm.reservePFN()
-	mm.mapPageTablePage(pfn)
-	return pfn
-}
-
-func (mm *atmanMemoryManager) mapPageTablePage(pagepfn pfn) {
-	var (
-		page = mm.pageTableAddr(pagepfn)
-
-		l4offset = page.pageTableOffset(pageTableLevel4)
-		l3offset = page.pageTableOffset(pageTableLevel3)
-		l2offset = page.pageTableOffset(pageTableLevel2)
-		l1offset = page.pageTableOffset(pageTableLevel1)
-
-		l4pfn pfn = mm.l4PFN
-
-		l4 xenPageTable = mm.l4
-		l3 xenPageTable
-		l2 xenPageTable
-	)
-
-	var (
-		l3pte = l4.Get(l4offset)
-		l3pfn = l3pte.pfn()
-	)
-
-	if !l3pte.hasFlag(xenPageTablePresent) {
-		l3pfn = mm.reservePFN()
-
-		mm.clearPage(l3pfn)
-		mm.writePte(l4pfn, l4offset, l3pfn, PTE_PAGE_TABLE_FLAGS|PTE_TEMP)
-		mm.mapPageTablePage(l3pfn)
-		mm.writePte(l4pfn, l4offset, l3pfn, PTE_PAGE_TABLE_FLAGS)
-	}
-
-	if l3pte.hasFlag(xenPageTableGuest1) {
-		// we're in the process of mapping this page
-		HYPERVISOR_update_va_mapping(uintptr(mm.l3TempPFN.vaddr()), uintptr(l3pte), 2)
-		l3 = mm.l3Temp
-	} else {
-		l3 = newXenPageTable(mm.pageTableAddr(l3pfn))
-	}
-
-	var (
-		l2pte = l3.Get(l3offset)
-		l2pfn = l2pte.pfn()
-	)
-
-	if !l2pte.hasFlag(xenPageTablePresent) {
-		l2pfn = mm.reservePFN()
-
-		mm.clearPage(l2pfn)
-		mm.writePte(l3pfn, l3offset, l2pfn, PTE_PAGE_TABLE_FLAGS|PTE_TEMP)
-		mm.mapPageTablePage(l2pfn)
-		mm.writePte(l3pfn, l3offset, l2pfn, PTE_PAGE_TABLE_FLAGS)
-	}
-
-	if l2pte.hasFlag(xenPageTableGuest1) {
-		// we're in the process of mapping this page
-		HYPERVISOR_update_va_mapping(uintptr(mm.l2TempPFN.vaddr()), uintptr(l2pte), 2)
-		l2 = mm.l2Temp
-	} else {
-		l2 = newXenPageTable(mm.pageTableAddr(l2pfn))
-	}
-
-	var (
-		l1pte = l2.Get(l2offset)
-		l1pfn = l1pte.pfn()
-	)
-
-	if !l1pte.hasFlag(xenPageTablePresent) {
-		l1pfn = mm.reservePFN()
-
-		mm.clearPage(l1pfn)
-		mm.writePte(l2pfn, l2offset, l1pfn, PTE_PAGE_TABLE_FLAGS|PTE_TEMP)
-		mm.mapPageTablePage(l1pfn)
-		mm.writePte(l2pfn, l2offset, l1pfn, PTE_PAGE_TABLE_FLAGS)
-	}
-
-	mm.writePte(l1pfn, l1offset, pagepfn, PTE_PAGE_TABLE_FLAGS)
 }
