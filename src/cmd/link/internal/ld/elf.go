@@ -1140,7 +1140,7 @@ func elfwriteatmansig() int {
 
 	var (
 		hypercallPage      = Linklookup(Ctxt, "runtime._atman_hypercall_page", 0)
-		pageSize           = 0x1000
+		pageSize           = uint64(0x1000)
 		pageStart          = uint64(Symaddr(hypercallPage))
 		hypercallPageStart = (pageStart + pageSize - 1) &^ (pageSize - 1)
 	)

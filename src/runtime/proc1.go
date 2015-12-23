@@ -53,7 +53,6 @@ func schedinit() {
 	tracebackinit()
 	moduledataverify()
 	stackinit()
-	atmaninit()
 	mallocinit()
 	mcommoninit(_g_.m)
 

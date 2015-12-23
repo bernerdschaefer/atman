@@ -4,6 +4,8 @@ import "unsafe"
 
 func osinit() {
 	ncpu = 1
+
+	atmaninit()
 }
 
 func sigpanic() {}
