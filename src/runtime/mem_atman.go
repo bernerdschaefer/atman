@@ -48,13 +48,13 @@ type atmanMemoryManager struct {
 	bootstrapStackPFN pfn // start of bootstrap stack
 	bootstrapEndPFN   pfn // end of bootstrap region
 
-	nextPFN pfn // next free frame
-	lastPFN pfn
-
 	nextHeapPage vaddr
 
 	l4PFN pfn
 	l4    xenPageTable
+
+	fa frameAllocator
+	pa pageAllocator
 }
 
 func (mm *atmanMemoryManager) init() {
@@ -75,16 +75,17 @@ func (mm *atmanMemoryManager) init() {
 
 	mm.bootstrapStackPFN = bootstrapStackPFN
 	mm.bootstrapEndPFN = bootstrapEndPFN
-	mm.nextPFN = bootstrapEndPFN.add(1)
-	mm.lastPFN = pfn(_atman_start_info.NrPages)
 
-	mm.nextHeapPage = mm.nextPFN.vaddr()
+	mm.fa.Next = frame(bootstrapEndPFN + 1)
+	mm.fa.Available = int(_atman_start_info.NrPages) - int(bootstrapEndPFN) - 1
+
+	mm.nextHeapPage = (bootstrapEndPFN + 1).vaddr()
 
 	mm.l4PFN = pageTableBase.pfn()
 	mm.l4 = mm.mapL4(mm.l4PFN)
 
-	mm.unmapLowAddresses()
 	mm.unmapBootstrapPageTables()
+	mm.unmapLowAddresses()
 }
 
 func (mm *atmanMemoryManager) unmapLowAddresses() {
@@ -169,9 +170,13 @@ func (mm *atmanMemoryManager) getPageTable(a, b, c int) xenPageTable {
 }
 
 func (mm *atmanMemoryManager) physAllocPage() pfn {
-	pfn := mm.reservePFN()
-	mm.clearPage(pfn)
-	return pfn
+	f, err := mm.fa.Alloc()
+	if err != nil {
+		throw(err)
+	}
+
+	mm.clearPage(pfn(f))
+	return pfn(f)
 }
 
 func (mm *atmanMemoryManager) pageTableWalk(addr vaddr) {
@@ -237,12 +242,6 @@ func (mm *atmanMemoryManager) reserveHeapPages(n uint64) unsafe.Pointer {
 	var p vaddr
 	p, mm.nextHeapPage = mm.nextHeapPage, mm.nextHeapPage+vaddr(n*_PAGESIZE)
 	return unsafe.Pointer(p)
-}
-
-func (mm *atmanMemoryManager) reservePFN() pfn {
-	var p pfn
-	p, mm.nextPFN = mm.nextPFN, mm.nextPFN+1
-	return p
 }
 
 // mapL4 sets up recursively mapped page table
